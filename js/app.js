@@ -1,5 +1,5 @@
 import { drinkArt, logoMark } from './art.js';
-import { PrizeWheel, celebrate } from './wheel.js';
+import { PrizeWheel, blast, celebrate } from './wheel.js';
 
 /* ==================================================================
    CONFIG — edit these three blocks only
@@ -27,6 +27,7 @@ const MENU = [
     flavour: 'Oreo',
     category: 'Milkshake',
     price: 7000,
+    spinPrice: 8000,
     tint: 'pink',
     art: 'shake-oreo',
     desc: 'Cookies and cream, blended thick.',
@@ -37,6 +38,7 @@ const MENU = [
     flavour: 'KitKat',
     category: 'Milkshake',
     price: 7000,
+    spinPrice: 8000,
     tint: 'pink',
     art: 'shake-kitkat',
     desc: 'Chocolate overload with crunch.',
@@ -47,6 +49,7 @@ const MENU = [
     flavour: 'Dark Fantasy',
     category: 'Milkshake',
     price: 7000,
+    spinPrice: 8000,
     tint: 'pink',
     art: 'shake-dark',
     desc: 'Dark chocolate, extra decadent.',
@@ -57,6 +60,7 @@ const MENU = [
     flavour: 'Cuban Mint',
     category: 'Mojito',
     price: 4000,
+    spinPrice: 5000,
     tint: 'mint',
     art: 'mojito-mint',
     desc: 'Mint, lime and crushed ice.',
@@ -67,6 +71,7 @@ const MENU = [
     flavour: 'Lime',
     category: 'Mojito',
     price: 4000,
+    spinPrice: 5000,
     tint: 'mint',
     art: 'mojito-lime',
     desc: 'Sharp citrus fizz over ice.',
@@ -77,6 +82,7 @@ const MENU = [
     flavour: 'Blue',
     category: 'Mojito',
     price: 4000,
+    spinPrice: 5000,
     tint: 'mint',
     art: 'mojito-blue',
     desc: 'Icy blue fizz, extra refreshing.',
@@ -87,6 +93,7 @@ const MENU = [
     flavour: 'Classic',
     category: 'Cold Coffee',
     price: 6000,
+    spinPrice: 7000,
     tint: 'caramel',
     art: 'coffee',
     desc: 'Bold coffee, shaken ice cold.',
@@ -94,12 +101,13 @@ const MENU = [
 ];
 
 // The wheel's visible prizes. Every percentage in RIGGED_SEQUENCE must exist here.
+// `weight` controls the physical slice size: low offers get the biggest slices.
 const SEGMENTS = [
-  { label: '10% OFF', percent: 10, color: '#FF7FB0' },
-  { label: '15% OFF', percent: 15, color: '#FFC24B' },
-  { label: '20% OFF', percent: 20, color: '#9BD9FF' },
-  { label: '10% OFF', percent: 10, color: '#6FE0C2' },
-  { label: '25% OFF', percent: 25, color: '#D3A8FF' },
+  { label: '10% OFF', percent: 10, weight: 34, color: '#FF7FB0' },
+  { label: '15% OFF', percent: 15, weight: 24, color: '#FFC24B' },
+  { label: '10% OFF', percent: 10, weight: 18, color: '#6FE0C2' },
+  { label: '20% OFF', percent: 20, weight: 14, color: '#9BD9FF' },
+  { label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
 ];
 
 /* ==================================================================
@@ -120,6 +128,7 @@ const menuGrid = $('#menu-grid');
 const orderBar = $('#order-bar');
 const barCount = $('#bar-count');
 const barTotal = $('#bar-total');
+const barSpin = $('#bar-spin');
 const reviewBtn = $('#review-btn');
 const clearBtn = $('#clear-cart');
 const summaryLines = $('#summary-lines');
@@ -167,19 +176,37 @@ function cartTotal() {
   return total;
 }
 
+function spinCartTotal() {
+  let total = 0;
+  for (const [id, qty] of state.cart) {
+    const item = MENU.find((entry) => entry.id === id);
+    if (item) total += item.spinPrice * qty;
+  }
+  return total;
+}
+
 function lines() {
-  return MENU.filter((item) => state.cart.has(item.id)).map((item) => ({
-    ...item,
-    qty: state.cart.get(item.id),
-    lineTotal: item.price * state.cart.get(item.id),
-  }));
+  return MENU.filter((item) => state.cart.has(item.id)).map((item) => {
+    const qty = state.cart.get(item.id);
+    return {
+      ...item,
+      qty,
+      lineTotal: item.price * qty,
+      spinLine: item.spinPrice * qty,
+    };
+  });
 }
 
 function conicGradient(segments) {
-  const step = 100 / segments.length;
-  return `conic-gradient(${segments
-    .map((segment, index) => `${segment.color} ${index * step}% ${(index + 1) * step}%`)
-    .join(', ')})`;
+  const total = segments.reduce((sum, segment) => sum + (Number(segment.weight) || 1), 0);
+  let cursor = 0;
+  const stops = segments.map((segment) => {
+    const start = (cursor / total) * 100;
+    cursor += Number(segment.weight) || 1;
+    const end = (cursor / total) * 100;
+    return `${segment.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+  });
+  return `conic-gradient(${stops.join(', ')})`;
 }
 
 function discountFor(total, percent) {
@@ -227,7 +254,10 @@ function cardTemplate(item) {
       <div class="card-body">
         <div class="card-title-row">
           <h3>${item.name}</h3>
-          <span class="card-price">${money(item.price)}</span>
+          <div class="card-price-stack">
+            <span class="card-price">${money(item.price)}</span>
+            <span class="card-spin-price">Spin ${money(item.spinPrice)}</span>
+          </div>
         </div>
         <p class="card-desc">${item.desc}</p>
         <div class="card-controls" data-controls>${controlsFor(item)}</div>
@@ -303,10 +333,12 @@ function renderAllCards() {
 function renderBar() {
   const count = countItems();
   const total = cartTotal();
+  const spinTotal = spinCartTotal();
   barCount.textContent = count
     ? `${count} drink${count === 1 ? '' : 's'} in this order`
     : 'Tap a drink to start';
   barTotal.textContent = money(total);
+  if (barSpin) barSpin.textContent = count ? `Spin ${money(spinTotal)}` : '';
   reviewBtn.disabled = count === 0;
   clearBtn.hidden = count === 0;
 }
@@ -384,13 +416,14 @@ function lineTemplate(item) {
       </div>
       <div class="line-price">
         <strong>${money(item.lineTotal)}</strong>
-        <small>${money(item.price)} each</small>
+        <small>${money(item.price)} each · spin ${money(item.spinPrice)}</small>
       </div>
     </article>`;
 }
 
 function totalCardTemplate() {
-  const total = cartTotal();
+  const normal = cartTotal();
+  const spinBase = spinCartTotal();
   const count = countItems();
   const spin = state.spin;
 
@@ -398,9 +431,10 @@ function totalCardTemplate() {
     return `
       <span class="total-label">Amount to pay</span>
       <strong class="total-amount">${money(spin.final)}</strong>
-      <span class="total-sub">${spin.percent}% Spin &amp; Win discount applied</span>
+      <span class="total-sub">${spin.percent}% off the Spin &amp; Win total</span>
       <div class="total-rule"></div>
-      <div class="discline"><span>Your total</span><strong>${money(spin.total)}</strong></div>
+      <div class="discline"><span>Normal total</span><strong>${money(spin.normalTotal)}</strong></div>
+      <div class="discline"><span>Spin &amp; Win starting total</span><strong>${money(spin.total)}</strong></div>
       <div class="discline is-discount"><span>Spin &amp; Win · ${spin.percent}% OFF</span><strong>− ${money(spin.discount)}</strong></div>
       <div class="discline"><span>You pay</span><strong>${money(spin.final)}</strong></div>
       <div class="spin-done">
@@ -409,9 +443,9 @@ function totalCardTemplate() {
             <span class="spin-done-kicker">Spin locked in</span>
             <h3>${spin.percent}% OFF</h3>
           </div>
-          <span class="chip-mint">${icon('check')} Saved ${money(spin.discount)}</span>
+          <span class="chip-mint">${icon('check')} −${money(spin.discount)}</span>
         </div>
-        <p>One spin per order. This discount is already applied.</p>
+        <p>Discount applied to the Spin &amp; Win total. The normal price would have been ${money(spin.normalTotal)}.</p>
         <button class="btn btn-primary pay-now" type="button" data-pay>
           Pay ${money(spin.final)} ${icon('arrow')}
         </button>
@@ -424,21 +458,28 @@ function totalCardTemplate() {
 
   return `
     <span class="total-label">Your total</span>
-    <strong class="total-amount">${money(total)}</strong>
-    <span class="total-sub">${count} drink${count === 1 ? '' : 's'} · freshly made</span>
+    <strong class="total-amount">${money(normal)}</strong>
+    <span class="total-sub">${count} drink${count === 1 ? '' : 's'} · normal price</span>
     <div class="total-rule"></div>
+    <div class="spin-base-row">
+      <span>Spin &amp; Win starting total</span>
+      <strong>${money(spinBase)}</strong>
+    </div>
+    <p class="spin-base-note">
+      That's ${money(spinBase - normal)} more for the spin — the discount applies to ${money(spinBase)}.
+    </p>
     <div class="spin-nudge">
       <div class="spin-nudge-top">
         <span class="nudge-wheel" style="background:${conicGradient(SEGMENTS)}" aria-hidden="true"></span>
         <div>
           <h3>Feeling lucky?</h3>
-          <p>Spin once to win up to 25% off this order.</p>
+          <p>Win up to 25% off the Spin &amp; Win total.</p>
         </div>
       </div>
       <button class="btn spin-btn-main" type="button" data-open-wheel>
         ${icon('wheel')} SPIN &amp; WIN
       </button>
-      <button class="skip-spin" type="button" data-pay>Pay without spinning →</button>
+      <button class="skip-spin" type="button" data-pay>Pay normal ${money(normal)} without spinning →</button>
     </div>
     <p class="total-foot">One spin per order · discount applied instantly</p>`;
 }
@@ -506,22 +547,27 @@ function renderPay() {
     return;
   }
 
-  const total = cartTotal();
-  const spin = state.spin && state.spin.total === total ? state.spin : null;
-  const final = spin ? spin.final : total;
+  const normal = cartTotal();
+  const spinBase = spinCartTotal();
+  const spin = state.spin && state.spin.total === spinBase ? state.spin : null;
+  const final = spin ? spin.final : normal;
 
   $('#pay-amount').textContent = money(final);
   $('#pay-note').textContent = spin
-    ? `${spin.percent}% Spin & Win discount applied`
-    : 'No spin discount · regular total';
+    ? `${spin.percent}% off the Spin & Win total`
+    : 'Normal price · no spin';
   $('#pay-upi').textContent = UPI.id;
   $('#qr-amount').textContent = money(final);
 
-  let breakdown = `<div class="discline"><span>Subtotal</span><strong>${money(total)}</strong></div>`;
+  let breakdown = '';
   if (spin) {
+    breakdown += `<div class="discline"><span>Normal total</span><strong>${money(normal)}</strong></div>`;
+    breakdown += `<div class="discline"><span>Spin &amp; Win starting total</span><strong>${money(spinBase)}</strong></div>`;
     breakdown += `<div class="discline is-discount"><span>Spin &amp; Win · ${spin.percent}% OFF</span><strong>− ${money(spin.discount)}</strong></div>`;
+    breakdown += `<div class="discline"><span>Amount to pay</span><strong>${money(final)}</strong></div>`;
+  } else {
+    breakdown += `<div class="discline"><span>Total to pay</span><strong>${money(final)}</strong></div>`;
   }
-  breakdown += `<div class="discline"><span>Amount to pay</span><strong>${money(final)}</strong></div>`;
   $('#pay-breakdown').innerHTML = breakdown;
 
   renderQr(final);
@@ -537,11 +583,12 @@ function resetWheelUI() {
   wheelIntro.hidden = false;
   wheelResult.hidden = true;
   wheelResult.innerHTML = '';
+  wheelResult.classList.remove('is-big');
   spinBtn.disabled = false;
   spinBtn.classList.remove('is-spinning', 'is-locked');
   spinBtn.querySelector('span').textContent = 'SPIN';
   spinBtn.querySelector('small').textContent = 'tap to win';
-  overlay.classList.remove('is-spinning', 'has-result');
+  overlay.classList.remove('is-spinning', 'has-result', 'is-big-win');
 }
 
 function ensureWheel() {
@@ -552,9 +599,19 @@ function ensureWheel() {
   return wheel;
 }
 
+function updateWheelTotals() {
+  const normal = cartTotal();
+  const spinBase = spinCartTotal();
+  const normalEl = $('#wheel-normal');
+  const spinEl = $('#wheel-spin');
+  if (normalEl) normalEl.textContent = money(normal);
+  if (spinEl) spinEl.textContent = money(spinBase);
+}
+
 function openWheel() {
   if (!countItems()) return;
   ensureWheel();
+  updateWheelTotals();
   overlay.classList.add('is-open');
   overlay.setAttribute('aria-hidden', 'false');
   document.body.classList.add('no-scroll');
@@ -588,15 +645,26 @@ function pickRiggedResult() {
 }
 
 function showResult(spin, { restore = false } = {}) {
+  const big = spin.percent >= 20;
+  const kicker = restore
+    ? 'Your spin result'
+    : spin.percent >= 25
+      ? 'JACKPOT!'
+      : spin.percent >= 20
+        ? 'HUGE WIN!'
+        : 'You won';
+
   wheelIntro.hidden = true;
   wheelResult.hidden = false;
+  wheelResult.classList.toggle('is-big', big);
   wheelResult.innerHTML = `
     <div class="result-badge">${icon('sparkle')}</div>
-    <span class="result-kicker">${restore ? 'Your spin result' : 'You won'}</span>
+    <span class="result-kicker">${kicker}</span>
     <h3>${spin.percent}% OFF</h3>
-    <p class="result-copy">That's ${money(spin.discount)} off your order.</p>
+    <p class="result-copy">That's ${money(spin.discount)} off the Spin &amp; Win total.</p>
     <div class="result-lines">
-      <div class="discline"><span>Your total</span><strong>${money(spin.total)}</strong></div>
+      <div class="discline"><span>Normal total</span><strong>${money(spin.normalTotal)}</strong></div>
+      <div class="discline"><span>Spin &amp; Win total</span><strong>${money(spin.total)}</strong></div>
       <div class="discline is-discount"><span>Discount · ${spin.percent}% OFF</span><strong>− ${money(spin.discount)}</strong></div>
       <div class="discline is-final"><span>You pay</span><strong>${money(spin.final)}</strong></div>
     </div>
@@ -606,6 +674,7 @@ function showResult(spin, { restore = false } = {}) {
     <button class="result-back" type="button" data-result-back>Back to order</button>`;
 
   overlay.classList.add('has-result');
+  overlay.classList.toggle('is-big-win', big);
   spinBtn.disabled = true;
   spinBtn.classList.remove('is-spinning');
   spinBtn.classList.add('is-locked');
@@ -617,7 +686,8 @@ async function doSpin() {
   if (spinning || state.spin) return;
   if (!countItems()) return;
 
-  const total = cartTotal();
+  const normalTotal = cartTotal();
+  const spinBase = spinCartTotal();
   const rigged = pickRiggedResult();
 
   spinning = true;
@@ -628,28 +698,36 @@ async function doSpin() {
   closeBtnDisable(true);
 
   wheel.sound.ensure();
-  if (navigator.vibrate) navigator.vibrate([18, 30, 18]);
+  wheel.sound.spinStart();
+  if (navigator.vibrate) navigator.vibrate([24, 40, 24]);
 
   try {
     await wheel.spinToIndex(rigged.index);
-    const { discount, final } = discountFor(total, rigged.percent);
+    const { discount, final } = discountFor(spinBase, rigged.percent);
     state.spin = {
       percent: rigged.percent,
       index: rigged.index,
-      total,
+      total: spinBase,
+      normalTotal,
       discount,
       final,
       at: Date.now(),
     };
 
+    const level = rigged.percent >= 25 ? 3 : rigged.percent >= 20 ? 2 : rigged.percent >= 15 ? 1.5 : 1;
+
     spinning = false;
     overlay.classList.remove('is-spinning');
-    flash.classList.remove('is-on');
+    flash.classList.remove('is-on', 'is-strong');
     void flash.offsetWidth;
     flash.classList.add('is-on');
-    celebrate({ count: 180 });
-    wheel.sound.win();
-    if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
+    if (level >= 2) flash.classList.add('is-strong');
+    blast({ intensity: level });
+    celebrate({ count: 150 + Math.round(rigged.percent * 8), spread: 1.1 });
+    wheel.sound.win(level);
+    if (navigator.vibrate) {
+      navigator.vibrate(level >= 2 ? [90, 45, 180, 45, 260] : [60, 40, 120]);
+    }
 
     showResult(state.spin);
   } catch (error) {

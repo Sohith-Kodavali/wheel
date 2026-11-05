@@ -15,6 +15,17 @@ function truncateLabel(label, max = 15) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+function segmentAngles(segments) {
+  const total = segments.reduce((sum, segment) => sum + Math.max(0.001, Number(segment.weight) || 1), 0);
+  let cursor = 0;
+  return segments.map((segment, index) => {
+    const span = TAU * (Math.max(0.001, Number(segment.weight) || 1) / total);
+    const start = cursor;
+    cursor += span;
+    return { start, span, mid: start + span / 2, index };
+  });
+}
+
 export function drawWheel(canvas, segments, { compact = false } = {}) {
   if (!canvas || !segments || segments.length < 2) return;
   const parent = canvas.parentElement;
@@ -29,7 +40,7 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
   const c = size / 2;
   const outer = c - 6;
   const segRadius = outer - (compact ? 12 : 30);
-  const angle = TAU / segments.length;
+  const arcs = segmentAngles(segments);
   const fontBase = compact ? size * 0.075 : Math.max(11, Math.min(20, size * 0.042));
 
   ctx.save();
@@ -41,11 +52,11 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
   ctx.strokeStyle = '#FFD3E2';
   ctx.stroke();
 
-  segments.forEach((segment, index) => {
-    const start = index * angle;
+  arcs.forEach((arc, index) => {
+    const segment = segments[index];
     ctx.beginPath();
     ctx.moveTo(c, c);
-    ctx.arc(c, c, segRadius, start, start + angle);
+    ctx.arc(c, c, segRadius, arc.start, arc.start + arc.span);
     ctx.closePath();
     ctx.fillStyle = segment.color || PALETTE[index % PALETTE.length];
     ctx.fill();
@@ -63,7 +74,7 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
   ctx.strokeStyle = '#FFCFE0';
   ctx.stroke();
 
-  const bulbCount = Math.max(12, segments.length * 2);
+  const bulbCount = Math.max(16, segments.length * 3);
   const bulbRadius = outer - (compact ? 6 : 18);
   for (let i = 0; i < bulbCount; i += 1) {
     const a = (i / bulbCount) * TAU;
@@ -75,11 +86,11 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
     ctx.fill();
   }
 
-  segments.forEach((segment, index) => {
-    const mid = index * angle + angle / 2;
+  arcs.forEach((arc, index) => {
+    const segment = segments[index];
     ctx.save();
     ctx.translate(c, c);
-    ctx.rotate(mid);
+    ctx.rotate(arc.mid);
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = textColorFor(segment.color);
@@ -120,7 +131,7 @@ export class WheelSound {
     return this.ctx;
   }
 
-  blip(freq, duration = 0.05, type = 'square', gainValue = 0.035, delay = 0) {
+  blip(freq, duration = 0.05, type = 'square', gainValue = 0.105, delay = 0) {
     const ctx = this.ensure();
     if (!ctx) return;
     const now = ctx.currentTime + delay;
@@ -137,18 +148,37 @@ export class WheelSound {
   }
 
   tick() {
-    this.blip(1180 + Math.random() * 180, 0.035, 'square', 0.02);
+    this.blip(1180 + Math.random() * 180, 0.04, 'square', 0.06);
   }
 
-  win() {
+  spinStart() {
+    for (let i = 0; i < 8; i += 1) {
+      this.blip(170 + i * 65, 0.18, 'sawtooth', 0.055, i * 0.055);
+    }
+  }
+
+  win(level = 1) {
     const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((freq, i) => this.blip(freq, 0.28, 'triangle', 0.08, i * 0.12));
-    this.blip(1318.5, 0.5, 'sine', 0.05, 0.5);
+    notes.forEach((freq, i) => this.blip(freq, 0.3, 'triangle', 0.24, i * 0.11));
+    this.blip(1318.5, 0.55, 'sine', 0.16, 0.45);
+    this.blip(78, 0.75, 'sine', 0.3, 0.02);
+
+    if (level >= 2) {
+      [1318.5, 1567.98, 2093].forEach((freq, i) =>
+        this.blip(freq, 0.36, 'triangle', 0.2, 0.55 + i * 0.1),
+      );
+      this.blip(65, 0.9, 'sine', 0.32, 0.08);
+    }
+    if (level >= 3) {
+      [1046.5, 1318.5, 1567.98, 2093].forEach((freq, i) =>
+        this.blip(freq, 0.42, 'sine', 0.16, 0.9 + i * 0.08),
+      );
+    }
   }
 
   lose() {
-    this.blip(392, 0.24, 'triangle', 0.06, 0);
-    this.blip(294, 0.36, 'triangle', 0.05, 0.18);
+    this.blip(392, 0.24, 'triangle', 0.18, 0);
+    this.blip(294, 0.36, 'triangle', 0.15, 0.18);
   }
 }
 
@@ -189,16 +219,24 @@ export class PrizeWheel {
     this.sound.setMuted(muted);
   }
 
+  arcs() {
+    return segmentAngles(this.segments);
+  }
+
   pointerIndex(rotation = this.rotation) {
-    const seg = 360 / this.segments.length;
-    const angle = (((270 - rotation) % 360) + 360) % 360;
-    return Math.min(this.segments.length - 1, Math.floor(angle / seg));
+    const arcs = this.arcs();
+    const angle = (((((270 - rotation) % 360) + 360) % 360) * Math.PI) / 180;
+    for (let i = arcs.length - 1; i >= 0; i -= 1) {
+      if (angle >= arcs[i].start) return i;
+    }
+    return 0;
   }
 
   snapToIndex(index) {
-    const seg = 360 / this.segments.length;
-    const center = index * seg + seg / 2;
-    this.rotation = ((270 - center) % 360 + 360) % 360;
+    const arc = this.arcs()[index];
+    if (!arc) return;
+    const centerDeg = (arc.mid * 180) / Math.PI;
+    this.rotation = (((270 - centerDeg) % 360) + 360) % 360;
     this.applyRotation();
   }
 
@@ -207,16 +245,21 @@ export class PrizeWheel {
     this.animating = true;
     this.sound.ensure();
 
-    const seg = 360 / this.segments.length;
-    const center = index * seg + seg / 2;
-    const jitter = (Math.random() - 0.5) * seg * 0.42;
-    const targetMod = ((270 - center - jitter) % 360 + 360) % 360;
-    const currentMod = ((this.rotation % 360) + 360) % 360;
+    const arc = this.arcs()[index];
+    if (!arc) {
+      this.animating = false;
+      return Promise.resolve();
+    }
+    const center = (arc.mid * 180) / Math.PI;
+    const spanDeg = (arc.span * 180) / Math.PI;
+    const jitter = (Math.random() - 0.5) * spanDeg * 0.5;
+    const targetMod = (((270 - center - jitter) % 360) + 360) % 360;
+    const currentMod = (((this.rotation % 360) + 360) % 360);
     const delta = (targetMod - currentMod + 360) % 360;
     const turns = this.reducedMotion ? 1 : 6 + Math.floor(Math.random() * 2);
     const travel = turns * 360 + delta;
     const start = this.rotation;
-    const totalDuration = duration || (this.reducedMotion ? 1400 : 5400 + Math.random() * 500);
+    const totalDuration = duration || (this.reducedMotion ? 1400 : 5600 + Math.random() * 500);
     const startTime = performance.now();
 
     return new Promise((resolve) => {
@@ -322,5 +365,131 @@ export function celebrate({ count = 140, spread = 1 } = {}) {
       canvas.remove();
     }
   }
+  requestAnimationFrame(frame);
+}
+
+function drawStar(ctx, radius) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i += 1) {
+    const r = i % 2 === 0 ? radius : radius * 0.45;
+    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** A radial explosion from the wheel. intensity: 1 = normal, 3 = jackpot. */
+export function blast({ intensity = 1 } = {}) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'blast-canvas';
+  document.body.append(canvas);
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const stage = document.querySelector('#wheel-stage');
+  const rect = stage?.getBoundingClientRect();
+  const cx = rect ? rect.left + rect.width / 2 : width / 2;
+  const cy = rect ? rect.top + rect.height / 2 : height * 0.42;
+  const extraOrigins =
+    intensity >= 2
+      ? [
+          [width * 0.24, height * 0.3],
+          [width * 0.78, height * 0.36],
+        ]
+      : [];
+  const origins = [[cx, cy], ...extraOrigins];
+  const perOrigin = intensity >= 3 ? 110 : intensity >= 2 ? 75 : 55;
+
+  const particles = [];
+  origins.forEach(([ox, oy], originIndex) => {
+    const count = originIndex === 0 ? perOrigin : Math.round(perOrigin * 0.65);
+    for (let i = 0; i < count; i += 1) {
+      const angle = Math.random() * TAU;
+      const speed = (3 + Math.random() * 17) * (0.8 + intensity * 0.25);
+      const gold = Math.random() < 0.38;
+      particles.push({
+        x: ox,
+        y: oy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1.5,
+        size: 2 + Math.random() * 5.5,
+        color: gold ? (Math.random() < 0.5 ? '#FFD15C' : '#FFE9A8') : PALETTE[Math.floor(Math.random() * 6)],
+        life: 0,
+        ttl: 65 + Math.random() * 45,
+        rotation: Math.random() * TAU,
+        spin: (Math.random() - 0.5) * 0.35,
+        shape: gold ? 'coin' : Math.random() < 0.3 ? 'star' : 'spark',
+      });
+    }
+  });
+
+  const start = performance.now();
+  const duration = 2700;
+
+  function frame(now) {
+    const elapsed = now - start;
+    ctx.clearRect(0, 0, width, height);
+
+    const rings = intensity >= 2 ? 3 : 2;
+    for (let r = 0; r < rings; r += 1) {
+      const p = Math.min(1, elapsed / (620 + r * 180));
+      if (p >= 1) continue;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 24 + p * Math.min(width, height) * (0.55 + r * 0.08), 0, TAU);
+      ctx.strokeStyle = `rgba(255, 224, 150, ${(1 - p) * 0.7})`;
+      ctx.lineWidth = 12 * (1 - p) + 2;
+      ctx.stroke();
+    }
+
+    for (const particle of particles) {
+      particle.life += 1;
+      particle.vy += 0.18;
+      particle.vx *= 0.985;
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.rotation += particle.spin;
+      const fade = Math.max(0, 1 - particle.life / particle.ttl);
+      if (fade <= 0) continue;
+
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.translate(particle.x, particle.y);
+      ctx.rotate(particle.rotation);
+      ctx.fillStyle = particle.color;
+      if (particle.shape === 'coin') {
+        ctx.beginPath();
+        ctx.arc(0, 0, particle.size, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(120, 80, 0, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else if (particle.shape === 'star') {
+        drawStar(ctx, particle.size * 1.4);
+      } else {
+        ctx.fillRect(-particle.size / 2, -particle.size / 4, particle.size * 2, particle.size * 0.6);
+      }
+      ctx.restore();
+    }
+
+    if (elapsed < duration) {
+      requestAnimationFrame(frame);
+    } else {
+      canvas.remove();
+    }
+  }
+
   requestAnimationFrame(frame);
 }

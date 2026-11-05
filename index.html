@@ -193,7 +193,10 @@
           <span class="bar-icon"><svg class="ico"><use href="#i-wheel" /></svg></span>
           <div>
             <span class="bar-count" id="bar-count">Tap a drink to start</span>
-            <strong class="bar-total" id="bar-total">₹0</strong>
+            <div class="bar-total-row">
+              <strong class="bar-total" id="bar-total">₹0</strong>
+              <span class="bar-spin" id="bar-spin"></span>
+            </div>
           </div>
         </div>
         <div class="bar-actions">
@@ -250,7 +253,11 @@
             <div class="wheel-intro" id="wheel-intro">
               <span class="sticker">UP TO 25% OFF</span>
               <h3>One spin.<br />Instant discount.</h3>
-              <p>Every spin wins something. Tap the wheel and watch your total drop.</p>
+              <p>Every spin wins. Your discount is applied to the Spin &amp; Win total, not the normal total.</p>
+              <div class="wheel-totals">
+                <div><span>Normal total</span><strong id="wheel-normal">₹0</strong></div>
+                <div class="is-spin"><span>Spin &amp; Win starting</span><strong id="wheel-spin">₹0</strong></div>
+              </div>
               <ul class="prize-preview" id="prize-preview"></ul>
               <span class="fine-print">One spin per order · discount capped at ₹60</span>
             </div>

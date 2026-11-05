@@ -40,6 +40,12 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100dvh;
@@ -212,10 +218,12 @@ svg {
 .app {
   position: relative;
   z-index: 1;
-  min-height: 100dvh;
+  height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0 clamp(18px, 3.2vw, 44px);
+  overflow: hidden;
 }
 
 .topbar {
@@ -371,6 +379,7 @@ svg {
   flex: 1;
   min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .screen {
@@ -379,14 +388,22 @@ svg {
 
 .screen.is-active {
   display: block;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
   animation: screen-in 0.38s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.screen.is-active::-webkit-scrollbar {
+  display: none;
 }
 
 #screen-menu.is-active {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - var(--topbar-h));
-  padding-bottom: 108px;
+  height: 100%;
+  padding-bottom: 104px;
+  overflow: hidden;
 }
 
 .screen-inner {
@@ -469,9 +486,8 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 2px;
-  scrollbar-width: thin;
 }
 
 .category-section {
@@ -529,7 +545,7 @@ svg {
 
 .category-row {
   flex: 1;
-  min-height: 138px;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -539,7 +555,7 @@ svg {
 .category-row .drink-card {
   flex-direction: row;
   height: 100%;
-  min-height: 138px;
+  min-height: 0;
 }
 
 .category-row .card-media {
@@ -765,6 +781,25 @@ svg {
   font-weight: 800;
   color: var(--pink-deep);
   white-space: nowrap;
+}
+
+.card-price-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+}
+
+.card-spin-price {
+  font-size: 0.54rem;
+  font-weight: 900;
+  color: var(--pink-deep);
+  background: var(--pink-tint);
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .card-desc {
@@ -1043,6 +1078,27 @@ svg {
   font-size: 1.8rem;
   font-weight: 800;
   line-height: 1.05;
+}
+
+.bar-total-row {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.bar-spin {
+  font-size: 0.66rem;
+  font-weight: 900;
+  color: var(--pink-deep);
+  background: var(--pink-tint);
+  border-radius: 999px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+.bar-spin:empty {
+  display: none;
 }
 
 .bar-actions {
@@ -1350,6 +1406,34 @@ svg {
 
 .discline.is-discount strong {
   color: var(--mint-deep);
+}
+
+.spin-base-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: linear-gradient(160deg, #ffe8f1, #ffdbe7);
+  border: 1.5px solid #ffc4d8;
+  border-radius: 15px;
+  padding: 10px 13px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  color: var(--pink-deep);
+}
+
+.spin-base-row strong {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.spin-base-note {
+  font-size: 0.66rem;
+  color: var(--ink-muted);
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 6px 0 10px;
 }
 
 .spin-nudge {
@@ -1983,6 +2067,47 @@ svg {
   line-height: 1.5;
 }
 
+.wheel-totals {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 2px;
+}
+
+.wheel-totals div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: #fff8ee;
+  border: 1px solid #f3e4d1;
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.wheel-totals .is-spin {
+  background: var(--pink-tint);
+  border-color: #ffc4d8;
+}
+
+.wheel-totals span {
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.wheel-totals strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.05;
+}
+
+.wheel-totals .is-spin span,
+.wheel-totals .is-spin strong {
+  color: var(--pink-deep);
+}
+
 .prize-preview {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2022,6 +2147,26 @@ svg {
 .wheel-result {
   text-align: center;
   animation: result-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+
+.wheel-result.is-big h3 {
+  font-size: clamp(2.8rem, 5vw, 3.8rem);
+  text-shadow: 0 0 26px rgba(255, 79, 134, 0.5);
+  animation: result-glow 1.1s ease-in-out infinite alternate;
+}
+
+.wheel-result.is-big .result-badge {
+  animation: badge-bounce 0.9s ease infinite alternate;
+  box-shadow: 0 0 0 7px rgba(255, 194, 75, 0.18), 0 14px 24px -12px rgba(160, 100, 0, 0.7);
+}
+
+.wheel-overlay.is-big-win .overlay-rays {
+  animation-duration: 12s;
+  opacity: 1;
+}
+
+.wheel-overlay.is-big-win .wheel-halo {
+  animation-duration: 0.8s;
 }
 
 .result-badge {
@@ -2127,6 +2272,16 @@ svg {
   animation: flash 0.7s ease-out both;
 }
 
+.flash.is-strong {
+  background: radial-gradient(
+    circle at 50% 42%,
+    #ffffff 0%,
+    rgba(255, 214, 120, 0.85) 32%,
+    rgba(255, 79, 134, 0.25) 55%,
+    transparent 76%
+  );
+}
+
 .confetti-canvas {
   position: fixed;
   inset: 0;
@@ -2134,23 +2289,26 @@ svg {
   pointer-events: none;
 }
 
+.blast-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  pointer-events: none;
+}
+
 /* ---------------- responsive ---------------- */
 
 @media (max-height: 760px) {
-  .category-row {
-    min-height: 124px;
-  }
-
-  .category-row .drink-card {
-    min-height: 124px;
-  }
-
   .card-desc {
     display: none;
   }
 
   .card-controls {
     margin-top: 5px;
+  }
+
+  .category-row .card-body {
+    padding: 8px 12px;
   }
 
   .wheel-stage {
@@ -2206,8 +2364,13 @@ svg {
     display: none;
   }
 
+  #screen-menu.is-active {
+    overflow-y: auto;
+  }
+
   .menu-grid {
     gap: 14px;
+    overflow: visible;
   }
 
   .category-section {
@@ -2407,6 +2570,25 @@ svg {
   }
 }
 
+@media (max-height: 700px) and (min-width: 901px) {
+  .menu-head p,
+  .category-tagline {
+    display: none;
+  }
+
+  .menu-head {
+    padding-bottom: 8px;
+  }
+
+  .category-head h2 {
+    font-size: 1rem;
+  }
+
+  .menu-head h1 {
+    font-size: 1.8rem;
+  }
+}
+
 @media (max-height: 600px) and (min-width: 900px) {
   .wheel-stage {
     width: min(74vh, 440px);
@@ -2498,6 +2680,26 @@ svg {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes result-glow {
+  from {
+    text-shadow: 0 0 14px rgba(255, 79, 134, 0.35);
+    transform: scale(1);
+  }
+  to {
+    text-shadow: 0 0 36px rgba(255, 194, 75, 0.75);
+    transform: scale(1.03);
+  }
+}
+
+@keyframes badge-bounce {
+  from {
+    transform: translateY(0) scale(1);
+  }
+  to {
+    transform: translateY(-5px) scale(1.08);
   }
 }
 
