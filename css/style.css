@@ -792,12 +792,12 @@ svg {
 }
 
 .card-spin-price {
-  font-size: 0.54rem;
+  font-size: 0.6rem;
   font-weight: 900;
   color: var(--pink-deep);
   background: var(--pink-tint);
   border-radius: 999px;
-  padding: 1px 6px;
+  padding: 2px 7px;
   white-space: nowrap;
   letter-spacing: 0.02em;
 }

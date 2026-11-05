@@ -272,7 +272,7 @@ function promoWideTemplate() {
       <div>
         <span class="eyebrow">Every order gets one spin</span>
         <h3>SPIN &amp; WIN</h3>
-        <p>Win up to 25% off your total. One spin, instantly applied.</p>
+        <p>Win up to 25% off the Spin &amp; Win total. One spin, instantly applied.</p>
       </div>
     </article>`;
 }
