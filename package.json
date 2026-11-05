@@ -1,0 +1,10 @@
+{
+  "name": "milkshake-tablet",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tablet kiosk for The Milkshake Factory: menu, rigged Spin & Win, UPI QR.",
+  "scripts": {
+    "start": "node serve.js"
+  }
+}
