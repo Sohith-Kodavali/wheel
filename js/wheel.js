@@ -15,6 +15,17 @@ function truncateLabel(label, max = 15) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+function shadeColor(hex, amount) {
+  const value = String(hex || '#FF7FB0').replace('#', '');
+  const number = parseInt(value, 16);
+  const target = amount < 0 ? 0 : 255;
+  const ratio = Math.abs(amount);
+  const channels = [(number >> 16) & 255, (number >> 8) & 255, number & 255].map((channel) =>
+    Math.round((target - channel) * ratio + channel),
+  );
+  return `rgb(${channels[0]}, ${channels[1]}, ${channels[2]})`;
+}
+
 function segmentAngles(segments) {
   const total = segments.reduce((sum, segment) => sum + Math.max(0.001, Number(segment.weight) || 1), 0);
   let cursor = 0;
@@ -54,14 +65,20 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
 
   arcs.forEach((arc, index) => {
     const segment = segments[index];
+    const baseColor = segment.color || PALETTE[index % PALETTE.length];
+    const gradient = ctx.createRadialGradient(c, c, segRadius * 0.06, c, c, segRadius);
+    gradient.addColorStop(0, shadeColor(baseColor, 0.16));
+    gradient.addColorStop(0.68, baseColor);
+    gradient.addColorStop(1, shadeColor(baseColor, -0.14));
+
     ctx.beginPath();
     ctx.moveTo(c, c);
     ctx.arc(c, c, segRadius, arc.start, arc.start + arc.span);
     ctx.closePath();
-    ctx.fillStyle = segment.color || PALETTE[index % PALETTE.length];
+    ctx.fillStyle = gradient;
     ctx.fill();
     ctx.lineWidth = 2.5;
-    ctx.strokeStyle = 'rgba(255,255,255,.65)';
+    ctx.strokeStyle = 'rgba(255, 250, 236, 0.8)';
     ctx.stroke();
   });
 
@@ -74,17 +91,21 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
   ctx.strokeStyle = '#FFCFE0';
   ctx.stroke();
 
-  const bulbCount = Math.max(16, segments.length * 3);
+  const bulbCount = Math.max(18, segments.length * 4);
   const bulbRadius = outer - (compact ? 6 : 18);
+  ctx.save();
+  ctx.shadowColor = '#FFDE9B';
+  ctx.shadowBlur = compact ? 0 : 9;
   for (let i = 0; i < bulbCount; i += 1) {
     const a = (i / bulbCount) * TAU;
     const x = c + Math.cos(a) * bulbRadius;
     const y = c + Math.sin(a) * bulbRadius;
     ctx.beginPath();
-    ctx.arc(x, y, compact ? 2 : 4.4, 0, TAU);
-    ctx.fillStyle = i % 2 === 0 ? '#FFFFFF' : '#FFC24B';
+    ctx.arc(x, y, compact ? 2 : 4.6, 0, TAU);
+    ctx.fillStyle = i % 2 === 0 ? '#FFFDF5' : '#FFC24B';
     ctx.fill();
   }
+  ctx.restore();
 
   arcs.forEach((arc, index) => {
     const segment = segments[index];
@@ -93,12 +114,40 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
     ctx.rotate(arc.mid);
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(30, 10, 20, 0.25)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 1;
     ctx.fillStyle = textColorFor(segment.color);
     ctx.font = `800 ${fontBase}px "Baloo 2", "Nunito", system-ui, sans-serif`;
     const pad = compact ? 12 : 34;
     ctx.fillText(truncateLabel(segment.label, compact ? 9 : 15), segRadius - pad, 0);
     ctx.restore();
   });
+
+  const gloss = ctx.createRadialGradient(
+    size * 0.32,
+    size * 0.22,
+    size * 0.02,
+    size * 0.32,
+    size * 0.22,
+    segRadius * 1.08,
+  );
+  gloss.addColorStop(0, 'rgba(255,255,255,.4)');
+  gloss.addColorStop(0.4, 'rgba(255,255,255,.08)');
+  gloss.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(c, c, segRadius, 0, TAU);
+  ctx.clip();
+  ctx.fillStyle = gloss;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(c, c, segRadius - 5, 0, TAU);
+  ctx.lineWidth = compact ? 2 : 3;
+  ctx.strokeStyle = 'rgba(232, 188, 102, 0.8)';
+  ctx.stroke();
 
   const hub = size * (compact ? 0.14 : 0.13);
   ctx.beginPath();
@@ -107,6 +156,11 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
   ctx.fill();
   ctx.lineWidth = compact ? 3 : 5;
   ctx.strokeStyle = '#FFFFFF';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(c, c, hub + (compact ? 3 : 7), 0, TAU);
+  ctx.lineWidth = compact ? 2 : 3;
+  ctx.strokeStyle = 'rgba(232, 188, 102, 0.9)';
   ctx.stroke();
   ctx.restore();
 }
@@ -126,7 +180,20 @@ export class WheelSound {
     if (this.muted) return null;
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return null;
-    if (!this.ctx) this.ctx = new AudioCtor();
+    if (!this.ctx) {
+      this.ctx = new AudioCtor();
+      // Master boost with a limiter so everything can be loud without harsh clipping.
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 2.8;
+      this.limiter = this.ctx.createDynamicsCompressor();
+      this.limiter.threshold.value = -18;
+      this.limiter.knee.value = 18;
+      this.limiter.ratio.value = 8;
+      this.limiter.attack.value = 0.003;
+      this.limiter.release.value = 0.25;
+      this.master.connect(this.limiter);
+      this.limiter.connect(this.ctx.destination);
+    }
     if (this.ctx.state === 'suspended') this.ctx.resume();
     return this.ctx;
   }
@@ -142,9 +209,9 @@ export class WheelSound {
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.master || ctx.destination);
     osc.start(now);
-    osc.stop(now + duration + 0.02);
+    osc.stop(now + duration + 0.03);
   }
 
   tick() {

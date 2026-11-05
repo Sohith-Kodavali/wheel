@@ -26,39 +26,40 @@ For a stall:
 3. Set the tablet to landscape and keep it on charge.
 4. Optionally enable Chrome kiosk mode / keep the screen awake in Android settings.
 
-## Change the important bits
+## Local admin — no backend needed
 
-Everything is in **`js/app.js`**, at the very top:
+Tap the **Settings** button (gear icon) in the top-right corner.
 
-```js
-const UPI = {
-  id: 'milkshakefactory@upi',   // ← put the stall's real UPI ID here
-  name: 'The Milkshake Factory',
-};
+- Default PIN: **`1234`** — change it in the admin panel after the first login.
+- Everything is stored in this tablet's browser `localStorage`. There is no server and no database.
 
-// The wheel is rigged: these are the prizes in the exact order they appear.
-const RIGGED_SEQUENCE = [10, 10, 15, 10, 20, 10, 25, 10, 15, 10];
+You can change:
 
-const LIMITS = {
-  maxDiscount: 6000, // ₹60, in paise
-  minPayable: 3000,  // ₹30, in paise
-};
+- **UPI ID and display name.**
+- **The UPI QR photo** — upload a PNG/JPG/WebP of the stall's scanner. It is resized locally and saved as a data URL in the browser.
+- **QR mode on the payment screen** — use the uploaded stall QR, or the generated QR that already contains the exact amount.
+- **Menu prices** — normal and Spin & Win price for every drink.
+- **Spin & Win** — the rigged prize sequence and the max-discount / minimum-payable limits.
+- **Admin PIN** (4–8 digits).
 
-// Each segment's `weight` controls how much of the wheel it takes.
-// 10% has the biggest share, 25% the smallest.
-const SEGMENTS = [
-  { label: '10% OFF', percent: 10, weight: 34, color: '#FF7FB0' },
-  { label: '15% OFF', percent: 15, weight: 24, color: '#FFC24B' },
-  { label: '10% OFF', percent: 10, weight: 18, color: '#6FE0C2' },
-  { label: '20% OFF', percent: 20, weight: 14, color: '#9BD9FF' },
-  { label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
-];
-```
+### The QR photo, explained
 
-- **Rigging:** the wheel does not use random probabilities. Each spin takes the next percentage from `RIGGED_SEQUENCE`, then the animation stops on a matching segment. Every spin wins. Change the list to control the order; for example, `[10, 15, 10, 20]` alternates.
+A photo of a normal stall QR does **not** contain the order amount. If you choose the uploaded photo, the pay screen shows the amount and tells the customer to enter it in their UPI app. The **generated QR** encodes the UPI ID and the exact amount, so the customer does not have to type it.
+
+- The photo lives on that one tablet. Clearing Chrome's site data removes it.
+- For multiple tablets, either upload the photo on each one, or connect Supabase later so all tablets share the same settings.
+- The PIN is only a local staff gate (it keeps customers out of the settings screen); it is not encryption.
+
+If the PIN is forgotten, clear the site's localStorage/history for the page; the defaults (including PIN `1234`) return.
+
+## Defaults in code
+
+The admin panel overrides the fallbacks in `js/app.js`. The default menu, prices, wheel weights and spin sequence live at the top of that file in `DEFAULT_MENU`, `DEFAULT_SETTINGS` and `SEGMENTS`.
+
+- **Rigging:** the wheel does not use random probabilities. Each spin takes the next percentage from the saved sequence, then the animation stops on a matching segment. Every spin wins. Change the sequence from the admin panel.
 - **Wheel area:** `weight` sets the slice size. 10% has 34% + 18% of the wheel, 15% has 24%, 20% has 14%, and the 25% jackpot is the narrowest slice.
-- **Discount:** taken from the **Spin & Win total**, then capped by `maxDiscount` and `minPayable`.
-- **Prices and menu:** the `MENU` array below the config. Each item has `price` (normal) and `spinPrice` in paise (`7000` = ₹70, `8000` = ₹80).
+- **Discount:** taken from the **Spin & Win total**, then capped by the max discount and minimum payable settings.
+- **Prices and menu:** every item has `price` (normal) and `spinPrice` in paise (`7000` = ₹70, `8000` = ₹80). The admin panel edits the live prices; the defaults are in `DEFAULT_MENU`.
 - **Prizes on the wheel:** the `SEGMENTS` array. Every percentage in the rigged sequence must have a matching segment.
 
 ### Spin & Win pricing
@@ -78,7 +79,12 @@ The menu cards, bottom bar, summary and payment screen all show both prices so t
 
 ### Effects
 
-A win triggers the weighted wheel, confetti, a radial spark/coin blast, a gold flash, screen shake, louder tick/fanfare sounds with mute, and haptics. A 20% or 25% win gets the extra-loud jackpot treatment and a pulsing result card.
+A win triggers the weighted wheel, confetti, a radial spark/coin blast, a gold flash, screen shake, very loud tick/fanfare sounds with mute, and haptics. A 20% or 25% win gets the extra-loud jackpot treatment and a pulsing result card.
+
+- Every button, drink card, stepper and admin control has a tap sound.
+- The audio master is boosted (about 5× the original) with a limiter, so it stays loud without turning into harsh clipping.
+- The wheel overlay has animated spotlights, carnival rays, a starfield, drifting bokeh, a gold rim, chasing bulbs, a gloss sweep and a bottom marquee.
+- Use the speaker button in the wheel overlay to mute everything; the choice is remembered.
 
 ## What each screen does
 

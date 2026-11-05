@@ -1,26 +1,11 @@
 import { drinkArt, logoMark } from './art.js';
-import { PrizeWheel, blast, celebrate } from './wheel.js';
+import { PrizeWheel, WheelSound, blast, celebrate } from './wheel.js';
 
 /* ==================================================================
-   CONFIG — edit these three blocks only
+   DEFAULT CONFIG — staff can change the live values from the gear menu
    ================================================================== */
 
-const UPI = {
-  id: 'milkshakefactory@upi',
-  name: 'The Milkshake Factory',
-};
-
-// The wheel is intentionally rigged. Every spin wins.
-// These are the percentages in the order they will be awarded. Edit freely.
-const RIGGED_SEQUENCE = [10, 10, 15, 10, 20, 10, 25, 10, 15, 10];
-
-// Discount safety limits, in paise. 6000 = ₹60.
-const LIMITS = {
-  maxDiscount: 6000,
-  minPayable: 3000,
-};
-
-const MENU = [
+const DEFAULT_MENU = [
   {
     id: 'oreo',
     name: 'Oreo Milkshake',
@@ -111,6 +96,101 @@ const SEGMENTS = [
 ];
 
 /* ==================================================================
+   LOCAL SETTINGS — persisted in this tablet's localStorage
+   ================================================================== */
+
+const SETTINGS_KEY = 'msf-tablet-settings-v1';
+const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
+const ALLOWED_PERCENTS = [...new Set(SEGMENTS.map((segment) => segment.percent))];
+
+const DEFAULT_SETTINGS = {
+  upi: { id: 'milkshakefactory@upi', name: 'The Milkshake Factory' },
+  qr: { mode: 'dynamic', image: '' },
+  menu: {},
+  spin: {
+    sequence: [10, 10, 15, 10, 20, 10, 25, 10, 15, 10],
+    maxDiscount: 6000,
+    minPayable: 3000,
+  },
+  adminPin: '1234',
+};
+
+let SETTINGS = loadSettings();
+let MENU = [];
+let RIGGED_SEQUENCE = [];
+let LIMITS = { maxDiscount: 6000, minPayable: 3000 };
+let adminImage = '';
+let adminUnlocked = false;
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function loadSettings() {
+  const base = clone(DEFAULT_SETTINGS);
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (!raw || typeof raw !== 'object') return base;
+
+    if (typeof raw.upi?.id === 'string' && UPI_PATTERN.test(raw.upi.id.trim())) base.upi.id = raw.upi.id.trim();
+    if (typeof raw.upi?.name === 'string' && raw.upi.name.trim()) {
+      base.upi.name = raw.upi.name.trim().slice(0, 60);
+    }
+    if (raw.qr && ['dynamic', 'uploaded'].includes(raw.qr.mode)) base.qr.mode = raw.qr.mode;
+    if (typeof raw.qr?.image === 'string' && raw.qr.image.startsWith('data:image/')) base.qr.image = raw.qr.image;
+
+    if (raw.spin && Array.isArray(raw.spin.sequence)) {
+      const sequence = raw.spin.sequence.map(Number).filter((percent) => ALLOWED_PERCENTS.includes(percent));
+      if (sequence.length) base.spin.sequence = sequence.slice(0, 60);
+    }
+    if (Number.isFinite(Number(raw.spin?.maxDiscount)) && Number(raw.spin.maxDiscount) >= 0) {
+      base.spin.maxDiscount = Math.round(Number(raw.spin.maxDiscount));
+    }
+    if (Number.isFinite(Number(raw.spin?.minPayable)) && Number(raw.spin.minPayable) >= 0) {
+      base.spin.minPayable = Math.round(Number(raw.spin.minPayable));
+    }
+    if (typeof raw.adminPin === 'string' && /^\d{4,8}$/.test(raw.adminPin)) base.adminPin = raw.adminPin;
+
+    if (raw.menu && typeof raw.menu === 'object') {
+      for (const item of DEFAULT_MENU) {
+        const override = raw.menu[item.id];
+        if (
+          override &&
+          Number.isInteger(override.price) &&
+          override.price > 0 &&
+          override.price <= 1_000_000 &&
+          Number.isInteger(override.spinPrice) &&
+          override.spinPrice >= override.price &&
+          override.spinPrice <= 1_000_000
+        ) {
+          base.menu[item.id] = { price: override.price, spinPrice: override.spinPrice };
+        }
+      }
+    }
+    return base;
+  } catch {
+    return base;
+  }
+}
+
+function applySettings() {
+  MENU = DEFAULT_MENU.map((item) => {
+    const override = SETTINGS.menu[item.id];
+    return override ? { ...item, price: override.price, spinPrice: override.spinPrice } : { ...item };
+  });
+  RIGGED_SEQUENCE = SETTINGS.spin.sequence.slice();
+  LIMITS = {
+    maxDiscount: SETTINGS.spin.maxDiscount,
+    minPayable: SETTINGS.spin.minPayable,
+  };
+  state.sequenceIndex = 0;
+}
+
+function persistSettings(next) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+}
+
+/* ==================================================================
    STATE & ELEMENTS
    ================================================================== */
 
@@ -141,12 +221,25 @@ const muteBtn = $('#mute-btn');
 const flash = $('#flash');
 const qrCode = $('#qr-code');
 const newOrderBtn = $('#new-order');
+const adminOverlay = $('#admin-overlay');
+const adminLock = $('#admin-lock');
+const adminContent = $('#admin-content');
+const adminForm = $('#admin-form');
+const pinForm = $('#pin-form');
+const pinInput = $('#pin-input');
+const pinError = $('#pin-error');
+const adminError = $('#admin-error');
+const adminQrPreview = $('#admin-qr-preview');
+const adminMenuRows = $('#admin-menu-rows');
+const toast = $('#toast');
 
 let wheel = null;
 let spinning = false;
 let muted = localStorage.getItem('msf-tablet-muted') === '1';
 let resetArmed = false;
 let resetTimer = 0;
+
+const uiSound = new WheelSound(muted);
 
 /* ==================================================================
    SMALL HELPERS
@@ -156,9 +249,42 @@ function icon(name) {
   return `<svg class="ico" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+  );
+}
+
 function money(paise) {
   const value = Number(paise) / 100;
   return `₹${Number.isInteger(value) ? value.toLocaleString('en-IN') : value.toFixed(2)}`;
+}
+
+function playClick() {
+  uiSound.blip(660 + Math.random() * 90, 0.045, 'triangle', 0.16);
+}
+
+function playPop() {
+  uiSound.blip(520, 0.06, 'sine', 0.2);
+  uiSound.blip(820, 0.08, 'triangle', 0.16, 0.035);
+}
+
+function playSuccess() {
+  [523.25, 659.25, 783.99, 1046.5].forEach((freq, index) => {
+    uiSound.blip(freq, 0.22, 'triangle', 0.2, index * 0.08);
+  });
+}
+
+function playError() {
+  uiSound.blip(190, 0.16, 'sawtooth', 0.16);
+  uiSound.blip(140, 0.2, 'sawtooth', 0.14, 0.12);
+}
+
+function playWhoosh() {
+  [0, 1, 2, 3].forEach((index) => {
+    uiSound.blip(320 + index * 90, 0.12, 'sine', 0.1, index * 0.04);
+  });
 }
 
 function countItems() {
@@ -377,6 +503,7 @@ function addItem(id) {
   if (current >= 20) return;
   changeQty(id, 1);
   bumpCard(id);
+  playPop();
 }
 
 function clearCart() {
@@ -502,8 +629,8 @@ const UPI_AMOUNT = (paise) => (paise / 100).toFixed(2);
 
 function upiLink(amount) {
   const params = new URLSearchParams({
-    pa: UPI.id,
-    pn: UPI.name,
+    pa: SETTINGS.upi.id,
+    pn: SETTINGS.upi.name,
     am: UPI_AMOUNT(amount),
     cu: 'INR',
     tn: 'The Milkshake Factory order',
@@ -513,8 +640,19 @@ function upiLink(amount) {
 
 function renderQr(amount) {
   qrCode.innerHTML = '';
+  const caption = $('#qr-caption');
+
+  if (SETTINGS.qr.mode === 'uploaded' && SETTINGS.qr.image) {
+    qrCode.innerHTML = `<img src="${escapeHtml(SETTINGS.qr.image)}" alt="Stall UPI QR code">`;
+    if (caption) caption.textContent = `Scan the stall QR · enter ${money(amount)} manually`;
+    return;
+  }
+
   if (typeof window.qrcode !== 'function') {
-    qrCode.innerHTML = `<p style="padding:20px;text-align:center;font-size:.85rem;color:#7b6266">QR library missing. Pay to <strong>${UPI.id}</strong></p>`;
+    qrCode.innerHTML = `<p style="padding:20px;text-align:center;font-size:.85rem;color:#7b6266">QR library missing. Pay to <strong>${escapeHtml(
+      SETTINGS.upi.id,
+    )}</strong></p>`;
+    if (caption) caption.textContent = 'Scan with any UPI app';
     return;
   }
   try {
@@ -527,8 +665,12 @@ function renderQr(amount) {
       scalable: true,
       alt: 'UPI QR code',
     });
+    if (caption) caption.textContent = 'Scan with any UPI app · exact amount included';
   } catch (error) {
-    qrCode.innerHTML = `<p style="padding:20px;text-align:center;font-size:.85rem;color:#7b6266">Could not generate the QR. Pay to <strong>${UPI.id}</strong></p>`;
+    qrCode.innerHTML = `<p style="padding:20px;text-align:center;font-size:.85rem;color:#7b6266">Could not generate the QR. Pay to <strong>${escapeHtml(
+      SETTINGS.upi.id,
+    )}</strong></p>`;
+    if (caption) caption.textContent = 'Scan with any UPI app';
   }
 }
 
@@ -556,8 +698,15 @@ function renderPay() {
   $('#pay-note').textContent = spin
     ? `${spin.percent}% off the Spin & Win total`
     : 'Normal price · no spin';
-  $('#pay-upi').textContent = UPI.id;
+  $('#pay-upi').textContent = SETTINGS.upi.id;
   $('#qr-amount').textContent = money(final);
+  const paySub = $('#pay-sub');
+  if (paySub) {
+    paySub.textContent =
+      SETTINGS.qr.mode === 'uploaded' && SETTINGS.qr.image
+        ? `Scan the stall QR, then enter ${money(final)} in your UPI app.`
+        : 'Point your phone camera at the QR and pay the exact amount.';
+  }
 
   let breakdown = '';
   if (spin) {
@@ -594,7 +743,8 @@ function resetWheelUI() {
 function ensureWheel() {
   if (!wheel) {
     wheel = new PrizeWheel($('#wheel-stage'), SEGMENTS, { muted });
-    wheel.setMuted(muted);
+    wheel.sound = uiSound;
+    uiSound.setMuted(muted);
   }
   return wheel;
 }
@@ -750,6 +900,256 @@ function closeBtnDisable(disabled) {
 }
 
 /* ==================================================================
+   LOCAL ADMIN
+   ================================================================== */
+
+function showToast(message) {
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('is-on');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove('is-on'), 2600);
+}
+
+function openAdmin() {
+  adminImage = SETTINGS.qr.image || '';
+  adminOverlay.classList.add('is-open');
+  adminOverlay.setAttribute('aria-hidden', 'false');
+  if (adminUnlocked) showAdminForm();
+  else showAdminLock();
+}
+
+function closeAdmin() {
+  adminUnlocked = false;
+  adminOverlay.classList.remove('is-open');
+  adminOverlay.setAttribute('aria-hidden', 'true');
+  adminError.textContent = '';
+}
+
+function showAdminLock() {
+  adminLock.hidden = false;
+  adminContent.hidden = true;
+  pinError.textContent = '';
+  pinInput.value = '';
+  setTimeout(() => pinInput.focus(), 90);
+}
+
+function showAdminForm() {
+  adminLock.hidden = true;
+  adminContent.hidden = false;
+  populateAdminForm();
+}
+
+function populateAdminForm() {
+  adminError.textContent = '';
+  $('#admin-upi-id').value = SETTINGS.upi.id;
+  $('#admin-upi-name').value = SETTINGS.upi.name;
+  $('#admin-qr-mode').value = SETTINGS.qr.mode;
+  $('#admin-sequence').value = SETTINGS.spin.sequence.join(', ');
+  $('#admin-max').value = SETTINGS.spin.maxDiscount / 100;
+  $('#admin-min').value = SETTINGS.spin.minPayable / 100;
+  $('#admin-new-pin').value = '';
+  adminImage = SETTINGS.qr.image || '';
+  renderAdminMenuRows();
+  renderAdminQrPreview();
+}
+
+function renderAdminMenuRows() {
+  adminMenuRows.innerHTML = MENU.map(
+    (item) => `
+    <div class="admin-menu-row" data-menu-id="${item.id}">
+      <span class="admin-drink">${escapeHtml(item.name)}<small>${escapeHtml(item.flavour)}</small></span>
+      <input
+        class="admin-input"
+        type="number"
+        min="1"
+        step="1"
+        data-price="normal"
+        value="${item.price / 100}"
+        aria-label="${escapeHtml(item.name)} normal price"
+      />
+      <input
+        class="admin-input"
+        type="number"
+        min="1"
+        step="1"
+        data-price="spin"
+        value="${item.spinPrice / 100}"
+        aria-label="${escapeHtml(item.name)} spin price"
+      />
+    </div>`,
+  ).join('');
+}
+
+function renderAdminQrPreview() {
+  adminQrPreview.innerHTML = adminImage
+    ? `<img src="${escapeHtml(adminImage)}" alt="UPI QR preview">`
+    : '<span>No QR photo</span>';
+}
+
+async function resizeImage(file, max = 640) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read the file'));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error('Could not decode the image'));
+    element.src = dataUrl;
+  });
+
+  const scale = Math.min(1, max / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/png');
+}
+
+async function handleQrUpload(file) {
+  if (!file) return;
+  if (file.size > 12 * 1024 * 1024) {
+    adminError.textContent = 'That image is too large. Use one under 12 MB.';
+    return;
+  }
+  try {
+    adminImage = await resizeImage(file);
+    $('#admin-qr-mode').value = 'uploaded';
+    renderAdminQrPreview();
+    adminError.textContent = '';
+  } catch (error) {
+    console.error('QR upload failed', error);
+    adminError.textContent = 'Could not read that image. Try a PNG or JPG.';
+  }
+}
+
+function submitPin(event) {
+  event.preventDefault();
+  if (pinInput.value === SETTINGS.adminPin) {
+    adminUnlocked = true;
+    pinError.textContent = '';
+    playSuccess();
+    showAdminForm();
+  } else {
+    pinError.textContent = 'Wrong PIN. Try again.';
+    pinInput.value = '';
+    pinInput.focus();
+    playError();
+  }
+}
+
+function saveAdminSettings(event) {
+  event.preventDefault();
+  adminError.textContent = '';
+
+  const upiId = $('#admin-upi-id').value.trim();
+  const upiName = $('#admin-upi-name').value.trim();
+  const qrMode = $('#admin-qr-mode').value;
+  const sequence = $('#admin-sequence')
+    .value.split(',')
+    .map((part) => Number(part.trim()))
+    .filter((value) => Number.isFinite(value));
+  const maxDiscount = Math.round(Number($('#admin-max').value) * 100);
+  const minPayable = Math.round(Number($('#admin-min').value) * 100);
+  const newPin = $('#admin-new-pin').value.trim();
+
+  if (!UPI_PATTERN.test(upiId)) {
+    adminError.textContent = 'Enter a valid UPI ID, for example stall@bank.';
+    return;
+  }
+  if (upiName.length < 2 || upiName.length > 60) {
+    adminError.textContent = 'UPI display name must be 2–60 characters.';
+    return;
+  }
+  if (qrMode === 'uploaded' && !adminImage) {
+    adminError.textContent = 'Upload a QR photo, or choose the generated QR.';
+    return;
+  }
+  if (!sequence.length || sequence.length > 60 || sequence.some((value) => !ALLOWED_PERCENTS.includes(value))) {
+    adminError.textContent = `Prize sequence must use only ${ALLOWED_PERCENTS.join(', ')}.`;
+    return;
+  }
+  if (!Number.isFinite(maxDiscount) || maxDiscount < 0 || maxDiscount > 1_000_000) {
+    adminError.textContent = 'Enter a valid maximum discount.';
+    return;
+  }
+  if (!Number.isFinite(minPayable) || minPayable < 0 || minPayable > 1_000_000) {
+    adminError.textContent = 'Enter a valid minimum payable amount.';
+    return;
+  }
+  if (newPin && !/^\d{4,8}$/.test(newPin)) {
+    adminError.textContent = 'The admin PIN must be 4–8 digits.';
+    return;
+  }
+
+  const menu = {};
+  for (const row of adminMenuRows.querySelectorAll('.admin-menu-row')) {
+    const id = row.dataset.menuId;
+    const item = DEFAULT_MENU.find((entry) => entry.id === id);
+    if (!item) continue;
+    const normal = Math.round(Number(row.querySelector('[data-price="normal"]').value) * 100);
+    const spin = Math.round(Number(row.querySelector('[data-price="spin"]').value) * 100);
+
+    if (!Number.isFinite(normal) || normal <= 0 || normal > 1_000_000) {
+      adminError.textContent = `${item.name}: enter a valid normal price.`;
+      return;
+    }
+    if (!Number.isFinite(spin) || spin < normal || spin > 1_000_000) {
+      adminError.textContent = `${item.name}: the spin price must be at least the normal price.`;
+      return;
+    }
+    menu[id] = { price: normal, spinPrice: spin };
+  }
+
+  const next = {
+    upi: { id: upiId, name: upiName },
+    qr: { mode: qrMode, image: adminImage },
+    menu,
+    spin: { sequence, maxDiscount, minPayable },
+    adminPin: newPin || SETTINGS.adminPin,
+  };
+
+  try {
+    persistSettings(next);
+  } catch {
+    adminError.textContent = 'Could not save. The QR photo may be too large for this browser.';
+    return;
+  }
+
+  SETTINGS = next;
+  applySettings();
+  renderMenu();
+  resetOrder();
+  closeAdmin();
+  showToast('Settings saved');
+  playSuccess();
+}
+
+function resetAdminSettings() {
+  if (!window.confirm('Reset all local settings to defaults? This also clears the current order.')) return;
+  SETTINGS = clone(DEFAULT_SETTINGS);
+  try {
+    persistSettings(SETTINGS);
+  } catch {
+    adminError.textContent = 'Could not reset the saved settings.';
+    return;
+  }
+  applySettings();
+  renderMenu();
+  resetOrder();
+  closeAdmin();
+  showToast('Defaults restored');
+  playSuccess();
+}
+
+/* ==================================================================
    NAVIGATION
    ================================================================== */
 
@@ -764,6 +1164,7 @@ function updateSteps(name) {
 }
 
 function showScreen(name) {
+  const previous = state.screen;
   state.screen = name;
   $$('.screen').forEach((screen) => {
     screen.classList.toggle('is-active', screen.id === `screen-${name}`);
@@ -778,6 +1179,11 @@ function showScreen(name) {
   }
   if (name === 'summary') renderSummary();
   if (name === 'pay') renderPay();
+
+  if (previous !== name) {
+    if (name === 'pay') playSuccess();
+    else playWhoosh();
+  }
 
   window.scrollTo(0, 0);
 }
@@ -873,6 +1279,28 @@ newOrderBtn.addEventListener('click', () => {
   resetOrder();
 });
 
+$('#admin-btn').addEventListener('click', openAdmin);
+document.querySelectorAll('[data-admin-close]').forEach((element) => {
+  element.addEventListener('click', closeAdmin);
+});
+pinForm.addEventListener('submit', submitPin);
+adminForm.addEventListener('submit', saveAdminSettings);
+
+$('#admin-qr-file').addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  await handleQrUpload(file);
+  event.target.value = '';
+});
+
+$('#admin-qr-remove').addEventListener('click', () => {
+  adminImage = '';
+  $('#admin-qr-mode').value = 'dynamic';
+  renderAdminQrPreview();
+  adminError.textContent = '';
+});
+
+$('#admin-reset').addEventListener('click', resetAdminSettings);
+
 $('#close-wheel').addEventListener('click', closeWheel);
 
 $('#wheel-stage').addEventListener('click', (event) => {
@@ -896,9 +1324,20 @@ wheelResult.addEventListener('click', (event) => {
 muteBtn.addEventListener('click', () => {
   muted = !muted;
   localStorage.setItem('msf-tablet-muted', muted ? '1' : '0');
+  uiSound.setMuted(muted);
   if (wheel) wheel.setMuted(muted);
   updateMuteButton();
+  if (!muted) playClick();
 });
+
+document.addEventListener(
+  'pointerdown',
+  (event) => {
+    if (!event.target.closest('button, .drink-card, .file-btn, [data-admin-close]')) return;
+    playClick();
+  },
+  { capture: true },
+);
 
 function updateMuteButton() {
   muteBtn.innerHTML = muted ? icon('mute') : icon('sound');
@@ -906,7 +1345,12 @@ function updateMuteButton() {
 }
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && overlay.classList.contains('is-open')) closeWheel();
+  if (event.key !== 'Escape') return;
+  if (adminOverlay.classList.contains('is-open')) {
+    closeAdmin();
+    return;
+  }
+  if (overlay.classList.contains('is-open')) closeWheel();
 });
 
 $('#fullscreen-btn').addEventListener('click', async () => {
@@ -936,6 +1380,7 @@ document.querySelectorAll('[data-home]').forEach((link) => {
    ================================================================== */
 
 function boot() {
+  applySettings();
   $('#brand-mark').innerHTML = logoMark();
   updateMuteButton();
 
