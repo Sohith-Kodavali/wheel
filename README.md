@@ -52,7 +52,7 @@ const LIMITS = {
 
 ## What each screen does
 
-- The menu has all seven drinks, a live total bar, and a **Clear** button.
+- The menu is split into three sections — **Milkshakes**, **Mojitos** and **Cold Coffee** — with a live total bar and a **Clear** button.
 - Tapping a drink (or its Add button) adds one. The stepper changes quantities. Max 20 per drink.
 - **Review order** opens the total screen. The total screen shows the order, a **Spin & Win** card, and a **Pay without spinning** link.
 - The wheel overlay has a canvas prize wheel with real deceleration, tick sounds, mute, confetti, a flash, screen shake, haptics, and a result panel.
