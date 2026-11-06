@@ -3275,29 +3275,61 @@ svg {
   }
 
   #screen-menu.is-active {
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .menu-grid {
-    gap: 14px;
-    overflow: visible;
+    gap: 10px;
+    overflow: hidden;
   }
 
   .category-section {
-    flex: none;
+    flex: 1;
+    min-height: 0;
   }
 
   .category-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     min-height: 0;
   }
 
   .category-row .drink-card {
-    min-height: 146px;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .category-row .card-media {
+    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+  }
+
+  .category-row .card-art {
+    inset: 6px 4px 0;
+  }
+
+  .category-row .card-body {
+    flex: none;
+    border-left: 0;
+    border-top: 1px solid rgba(90, 45, 60, 0.06);
+    padding: 7px 9px;
+  }
+
+  .category-row .card-title-row h3 {
+    font-size: 0.82rem;
+  }
+
+  .category-row .card-price {
+    font-size: 0.86rem;
+  }
+
+  .category-row .card-desc {
+    display: none;
   }
 
   .promo-wide {
-    grid-column: auto;
+    grid-column: span 2;
+    flex-direction: row;
   }
 
   .summary-grid,
@@ -3405,14 +3437,6 @@ svg {
 
   .category-head h2 {
     font-size: 1.15rem;
-  }
-
-  .category-row .drink-card {
-    min-height: 140px;
-  }
-
-  .category-row .card-media {
-    flex-basis: 36%;
   }
 
   .summary-head {
