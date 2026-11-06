@@ -27,7 +27,7 @@
   --shadow-lg: 0 40px 80px -40px rgba(120, 40, 70, 0.5);
   --font-display: "Baloo 2", "Nunito", "Segoe UI", system-ui, sans-serif;
   --font-body: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --topbar-h: 78px;
+  --topbar-h: 70px;
 }
 
 *,
@@ -427,7 +427,7 @@ svg {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding-bottom: 104px;
+  padding-bottom: 96px;
   overflow: hidden;
 }
 
@@ -449,7 +449,7 @@ svg {
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  padding: 4px 0 16px;
+  padding: 2px 0 8px;
   flex: none;
 }
 
@@ -469,14 +469,14 @@ svg {
 }
 
 .menu-head h1 {
-  font-size: clamp(1.9rem, 3vw, 2.5rem);
-  margin-top: 4px;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  margin-top: 2px;
 }
 
 .menu-head p {
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--ink-soft);
-  font-size: 0.92rem;
+  font-size: 0.78rem;
   font-weight: 600;
 }
 
@@ -510,7 +510,7 @@ svg {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   overflow: hidden;
   padding: 2px;
 }
@@ -520,7 +520,7 @@ svg {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 
 .category-head {
@@ -542,25 +542,25 @@ svg {
 
 .category-index {
   font-family: var(--font-display);
-  font-size: 0.66rem;
+  font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.18em;
   color: var(--pink-deep);
 }
 
 .category-head h2 {
-  font-size: 1.22rem;
+  font-size: 1rem;
   line-height: 1;
 }
 
 .category-tagline {
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   font-weight: 700;
   color: var(--ink-muted);
 }
 
 .category-count {
-  font-size: 0.62rem;
+  font-size: 0.56rem;
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -573,7 +573,7 @@ svg {
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 /* horizontal cards inside the category rows */
@@ -584,12 +584,12 @@ svg {
 }
 
 .category-row .card-media {
-  flex: 0 0 40%;
+  flex: 0 0 32%;
   height: 100%;
 }
 
 .category-row .card-art {
-  inset: 6px 4px 0;
+  inset: 4px 2px 0;
 }
 
 .category-row .card-body {
@@ -597,73 +597,73 @@ svg {
   min-width: 0;
   border-top: 0;
   border-left: 1px solid rgba(90, 45, 60, 0.06);
-  padding: 10px 14px;
+  padding: 6px 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .category-row .card-title-row h3 {
-  font-size: 1rem;
+  font-size: 0.88rem;
 }
 
 .category-row .card-price {
-  font-size: 1.02rem;
-}
-
-.category-row .card-desc {
-  font-size: 0.66rem;
-}
-
-.category-row .card-controls {
-  min-height: 34px;
-  margin-top: 6px;
-}
-
-.category-row .add-pill {
-  padding: 6px 11px;
-  font-size: 0.72rem;
-  box-shadow: 0 4px 0 #a81245;
-}
-
-.category-row .add-pill .ico {
-  width: 12px;
-  height: 12px;
-}
-
-.category-row .step-btn {
-  width: 30px;
-  height: 30px;
-}
-
-.category-row .step-qty {
-  font-size: 0.84rem;
-}
-
-.category-row .line-total {
   font-size: 0.92rem;
 }
 
+.category-row .card-desc {
+  font-size: 0.6rem;
+}
+
+.category-row .card-controls {
+  min-height: 28px;
+  margin-top: 4px;
+}
+
+.category-row .add-pill {
+  padding: 4px 9px;
+  font-size: 0.66rem;
+  box-shadow: 0 3px 0 #a81245;
+}
+
+.category-row .add-pill .ico {
+  width: 11px;
+  height: 11px;
+}
+
+.category-row .step-btn {
+  width: 26px;
+  height: 26px;
+}
+
+.category-row .step-qty {
+  font-size: 0.8rem;
+}
+
+.category-row .line-total {
+  font-size: 0.82rem;
+}
+
 .category-row .card-flavor {
-  top: 8px;
-  left: 8px;
-  font-size: 0.54rem;
-  padding: 4px 8px;
+  top: 6px;
+  left: 6px;
+  font-size: 0.5rem;
+  padding: 3px 7px;
 }
 
 .category-row .card-count {
-  top: 7px;
-  right: 7px;
-  min-width: 26px;
-  height: 26px;
-  font-size: 0.72rem;
+  top: 5px;
+  right: 5px;
+  min-width: 22px;
+  height: 22px;
+  font-size: 0.66rem;
 }
 
 .drink-card {
   position: relative;
   background: var(--paper);
   border: 1px solid rgba(90, 45, 60, 0.08);
-  border-radius: 26px;
+  border-radius: 20px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -782,7 +782,7 @@ svg {
 
 .card-body {
   flex: none;
-  padding: 12px 14px 13px;
+  padding: 8px 10px;
   background: var(--paper);
   border-top: 1px solid rgba(90, 45, 60, 0.06);
 }
@@ -795,41 +795,22 @@ svg {
 }
 
 .card-title-row h3 {
-  font-size: 1.1rem;
+  font-size: 1rem;
   line-height: 1.12;
   min-width: 0;
 }
 
 .card-price {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--pink-deep);
   white-space: nowrap;
 }
 
-.card-price-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex: none;
-}
-
-.card-spin-price {
-  font-size: 0.6rem;
-  font-weight: 900;
-  color: var(--pink-deep);
-  background: var(--pink-tint);
-  border-radius: 999px;
-  padding: 2px 7px;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
-}
-
 .card-desc {
-  margin-top: 2px;
-  font-size: 0.7rem;
+  margin-top: 1px;
+  font-size: 0.62rem;
   color: var(--ink-muted);
   font-weight: 600;
   white-space: nowrap;
@@ -838,8 +819,8 @@ svg {
 }
 
 .card-controls {
-  min-height: 40px;
-  margin-top: 8px;
+  min-height: 32px;
+  margin-top: 5px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -847,7 +828,7 @@ svg {
 }
 
 .tap-hint {
-  font-size: 0.66rem;
+  font-size: 0.6rem;
   font-weight: 800;
   color: var(--ink-muted);
   letter-spacing: 0.02em;
@@ -857,13 +838,13 @@ svg {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 14px;
+  padding: 6px 11px;
   border-radius: 999px;
   background: linear-gradient(180deg, #ff5c93, #e31c5f);
   color: #fff;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 900;
-  box-shadow: 0 5px 0 #a81245;
+  box-shadow: 0 4px 0 #a81245;
 }
 
 .add-pill .ico {
@@ -974,13 +955,13 @@ svg {
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
-  gap: 18px;
-  padding: 14px 20px;
+  gap: 12px;
+  padding: 10px 14px;
 }
 
 .promo-wide .mini-wheel {
-  width: 84px;
-  height: 84px;
+  width: 60px;
+  height: 60px;
 }
 
 .promo-wide .eyebrow {
@@ -989,11 +970,12 @@ svg {
 }
 
 .promo-wide h3 {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
 }
 
 .promo-wide p {
   max-width: 34ch;
+  font-size: 0.64rem;
 }
 
 .mini-wheel {
@@ -1110,20 +1092,6 @@ svg {
   align-items: baseline;
   gap: 9px;
   flex-wrap: wrap;
-}
-
-.bar-spin {
-  font-size: 0.66rem;
-  font-weight: 900;
-  color: var(--pink-deep);
-  background: var(--pink-tint);
-  border-radius: 999px;
-  padding: 2px 7px;
-  white-space: nowrap;
-}
-
-.bar-spin:empty {
-  display: none;
 }
 
 .bar-actions {
@@ -1431,34 +1399,6 @@ svg {
 
 .discline.is-discount strong {
   color: var(--mint-deep);
-}
-
-.spin-base-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: linear-gradient(160deg, #ffe8f1, #ffdbe7);
-  border: 1.5px solid #ffc4d8;
-  border-radius: 15px;
-  padding: 10px 13px;
-  font-size: 0.7rem;
-  font-weight: 900;
-  color: var(--pink-deep);
-}
-
-.spin-base-row strong {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.spin-base-note {
-  font-size: 0.66rem;
-  color: var(--ink-muted);
-  font-weight: 700;
-  line-height: 1.4;
-  margin: 6px 0 10px;
 }
 
 .spin-nudge {
@@ -2781,7 +2721,7 @@ svg {
 .admin-menu-head,
 .admin-menu-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 108px 108px;
+  grid-template-columns: minmax(0, 1fr) 108px;
   gap: 10px;
   align-items: center;
 }
@@ -2819,6 +2759,97 @@ svg {
   padding: 8px 10px;
   text-align: right;
   min-height: 38px;
+}
+
+.admin-offer-head,
+.admin-offer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 56px 40px;
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-offer-head {
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 4px 2px;
+}
+
+.admin-offer-row {
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(90, 45, 60, 0.1);
+}
+
+.admin-offer-row .admin-input {
+  padding: 8px 10px;
+  min-height: 38px;
+}
+
+.admin-percent {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.admin-percent span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ink-muted);
+}
+
+.admin-color {
+  width: 44px;
+  height: 38px;
+  padding: 3px;
+  border: 1.5px solid rgba(90, 45, 60, 0.15);
+  border-radius: 10px;
+  background: #fffdf8;
+  cursor: pointer;
+}
+
+.admin-offer-row .remove-line {
+  width: 34px;
+  height: 34px;
+}
+
+.admin-add-btn {
+  margin-top: 10px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+}
+
+.admin-sequence-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 34px;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(90, 45, 60, 0.1);
+}
+
+.admin-seq-index {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.admin-sequence-row select {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.admin-sequence-row .remove-line {
+  width: 34px;
+  height: 34px;
+}
+
+.admin-limits {
+  margin-top: 16px;
 }
 
 .admin-actions {
@@ -2886,7 +2917,7 @@ svg {
 
   .admin-menu-head,
   .admin-menu-row {
-    grid-template-columns: minmax(0, 1fr) 78px 78px;
+    grid-template-columns: minmax(0, 1fr) 78px;
     gap: 6px;
   }
 
@@ -2897,6 +2928,22 @@ svg {
   .admin-menu-row .admin-input {
     font-size: 0.75rem;
     padding: 6px 7px;
+  }
+
+  .admin-offer-head,
+  .admin-offer-row {
+    grid-template-columns: minmax(0, 1fr) 72px 44px 30px;
+    gap: 6px;
+  }
+
+  .admin-offer-row .admin-input {
+    font-size: 0.75rem;
+    padding: 6px 7px;
+  }
+
+  .admin-color {
+    width: 38px;
+    height: 36px;
   }
 
   .admin-lock-form {

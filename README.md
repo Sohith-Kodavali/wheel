@@ -38,8 +38,9 @@ You can change:
 - **UPI ID and display name.**
 - **The UPI QR photo** — upload a PNG/JPG/WebP of the stall's scanner. It is resized locally and saved as a data URL in the browser.
 - **QR mode on the payment screen** — use the uploaded stall QR, or the generated QR that already contains the exact amount.
-- **Menu prices** — normal and Spin & Win price for every drink.
-- **Spin & Win** — the rigged prize sequence and the max-discount / minimum-payable limits.
+- **Menu prices** — one price for every drink.
+- **Wheel offers** — add, edit or remove the slices on the wheel (label, discount and colour).
+- **Spin sequence** — a separate ordered list of offers that decides what each spin lands on, plus the max-discount / minimum-payable limits.
 - **Admin PIN** (4–8 digits).
 
 ### The QR photo, explained
@@ -54,28 +55,25 @@ If the PIN is forgotten, clear the site's localStorage/history for the page; the
 
 ## Defaults in code
 
-The admin panel overrides the fallbacks in `js/app.js`. The default menu, prices, wheel weights and spin sequence live at the top of that file in `DEFAULT_MENU`, `DEFAULT_SETTINGS` and `SEGMENTS`.
+The admin panel overrides the fallbacks in `js/app.js`. The default menu, prices, wheel offers and spin sequence live at the top of that file in `DEFAULT_MENU`, `DEFAULT_WHEEL` and `DEFAULT_SETTINGS`.
 
-- **Rigging:** the wheel does not use random probabilities. Each spin takes the next percentage from the saved sequence, then the animation stops on a matching segment. Every spin wins. Change the sequence from the admin panel.
-- **Wheel area:** `weight` sets the slice size. 10% has 34% + 18% of the wheel, 15% has 24%, 20% has 14%, and the 25% jackpot is the narrowest slice.
-- **Discount:** taken from the **Spin & Win total**, then capped by the max discount and minimum payable settings.
-- **Prices and menu:** every item has `price` (normal) and `spinPrice` in paise (`7000` = ₹70, `8000` = ₹80). The admin panel edits the live prices; the defaults are in `DEFAULT_MENU`.
-- **Prizes on the wheel:** the `SEGMENTS` array. Every percentage in the rigged sequence must have a matching segment.
+- **Rigging:** the wheel does not use random probabilities. Each spin takes the next offer from the saved sequence and stops on that slice. Every spin wins. Both the offers and the sequence are edited from the admin panel.
+- **Wheel area:** offers keep their internal `weight`, which sets the slice size. New offers get the average weight of the existing ones.
+- **Discount:** taken from the order total, then capped by the max discount and minimum payable settings.
+- **Prices and menu:** every item has a single `price` in paise (`7500` = ₹75). The admin panel edits the live prices; the defaults are in `DEFAULT_MENU`.
 
-### Spin & Win pricing
+### Prices
 
-Every drink has two prices: the normal price and a higher Spin & Win price (+₹10 by default).
+| Drink | Price |
+|---|---:|
+| Milkshakes (Oreo / KitKat / Dark Fantasy) | ₹75 |
+| Mojitos (Cuban Mint / Lime / Blue) | ₹39 |
+| Cold Coffee | ₹65 |
 
-| Order | Normal total | Spin & Win starting total |
-|---|---:|---:|
-| Oreo ₹70 + Lime ₹40 | ₹110 | ₹130 |
-| Oreo + KitKat + Cold Coffee | ₹200 | ₹230 |
+- **Pay without spinning** → the customer pays the order total.
+- **Spin & Win** → the discount is calculated on the order total.
 
-- **Pay without spinning** → the customer pays the normal total.
-- **Spin & Win** → the base becomes the higher Spin & Win total. The discount is calculated on **that** amount.
-- Example: normal ₹110, Spin & Win ₹130. Win 10% → ₹13 off ₹130 → **pay ₹117**. Win 25% → ₹32.50 off (capped at ₹60) → **pay ₹97.50**.
-
-The menu cards, bottom bar, summary and payment screen all show both prices so the higher spin price is never hidden.
+The menu cards, bottom bar, summary and payment screen show that single price.
 
 ### Effects
 
@@ -89,12 +87,12 @@ A win triggers the weighted wheel, confetti, a radial spark/coin blast, a gold f
 ## What each screen does
 
 - The menu is split into three sections — **Milkshakes**, **Mojitos** and **Cold Coffee** — with a live total bar and a **Clear** button. It is locked to the tablet screen and does not scroll between sections.
-- Every card shows the normal price and the higher Spin & Win price.
+- Every card shows the drink's single price.
 - Tapping a drink (or its Add button) adds one. The stepper changes quantities. Max 20 per drink.
-- **Review order** opens the total screen. The total screen shows the normal total, the higher Spin & Win starting total, a **Spin & Win** button, and a **Pay normal ₹X without spinning** link.
+- **Review order** opens the total screen. The total screen shows the order total, a **Spin & Win** button, and a **Pay ₹X without spinning** link.
 - The wheel overlay is a weighted canvas wheel with real deceleration, tick sounds, mute, confetti, a spark/coin blast, a flash, screen shake, haptics, and a result panel.
-- The result is locked for the order. Changing the order clears it and returns to the normal total.
-- After spinning, **Pay ₹X** goes straight to the QR. The QR encodes the exact discounted amount, and the payment screen lists normal total → Spin & Win starting total → discount → final.
+- The result is locked for the order. Changing the order clears it and returns to the full order total.
+- After spinning, **Pay ₹X** goes straight to the QR. The QR encodes the exact discounted amount, and the payment screen lists order total → discount → final.
 - On the payment screen, **New order** requires two taps, so staff can clear the tablet after the customer pays.
 
 ## Notes

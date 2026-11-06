@@ -11,8 +11,7 @@ const DEFAULT_MENU = [
     name: 'Oreo Milkshake',
     flavour: 'Oreo',
     category: 'Milkshake',
-    price: 7000,
-    spinPrice: 8000,
+    price: 7500,
     tint: 'pink',
     art: 'shake-oreo',
     desc: 'Cookies and cream, blended thick.',
@@ -22,8 +21,7 @@ const DEFAULT_MENU = [
     name: 'KitKat Milkshake',
     flavour: 'KitKat',
     category: 'Milkshake',
-    price: 7000,
-    spinPrice: 8000,
+    price: 7500,
     tint: 'pink',
     art: 'shake-kitkat',
     desc: 'Chocolate overload with crunch.',
@@ -33,8 +31,7 @@ const DEFAULT_MENU = [
     name: 'Dark Fantasy Milkshake',
     flavour: 'Dark Fantasy',
     category: 'Milkshake',
-    price: 7000,
-    spinPrice: 8000,
+    price: 7500,
     tint: 'pink',
     art: 'shake-dark',
     desc: 'Dark chocolate, extra decadent.',
@@ -44,8 +41,7 @@ const DEFAULT_MENU = [
     name: 'Cuban Mint Mojito',
     flavour: 'Cuban Mint',
     category: 'Mojito',
-    price: 4000,
-    spinPrice: 5000,
+    price: 3900,
     tint: 'mint',
     art: 'mojito-mint',
     desc: 'Mint, lime and crushed ice.',
@@ -55,8 +51,7 @@ const DEFAULT_MENU = [
     name: 'Lime Mojito',
     flavour: 'Lime',
     category: 'Mojito',
-    price: 4000,
-    spinPrice: 5000,
+    price: 3900,
     tint: 'mint',
     art: 'mojito-lime',
     desc: 'Sharp citrus fizz over ice.',
@@ -66,8 +61,7 @@ const DEFAULT_MENU = [
     name: 'Blue Mojito',
     flavour: 'Blue',
     category: 'Mojito',
-    price: 4000,
-    spinPrice: 5000,
+    price: 3900,
     tint: 'mint',
     art: 'mojito-blue',
     desc: 'Icy blue fizz, extra refreshing.',
@@ -77,22 +71,22 @@ const DEFAULT_MENU = [
     name: 'Cold Coffee',
     flavour: 'Classic',
     category: 'Cold Coffee',
-    price: 6000,
-    spinPrice: 7000,
+    price: 6500,
     tint: 'caramel',
     art: 'coffee',
     desc: 'Bold coffee, shaken ice cold.',
   },
 ];
 
-// The wheel's visible prizes. Every percentage in RIGGED_SEQUENCE must exist here.
-// `weight` controls the physical slice size: low offers get the biggest slices.
-const SEGMENTS = [
-  { label: '10% OFF', percent: 10, weight: 34, color: '#FF7FB0' },
-  { label: '15% OFF', percent: 15, weight: 24, color: '#FFC24B' },
-  { label: '10% OFF', percent: 10, weight: 18, color: '#6FE0C2' },
-  { label: '20% OFF', percent: 20, weight: 14, color: '#9BD9FF' },
-  { label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
+const OFFER_COLORS = ['#FF7FB0', '#FFC24B', '#6FE0C2', '#9BD9FF', '#D3A8FF', '#FF9A6C', '#FF6B8B', '#8FD3FF'];
+
+// The wheel's default offers. `weight` controls the physical slice size.
+const DEFAULT_WHEEL = [
+  { id: 'off-1', label: '10% OFF', percent: 10, weight: 34, color: '#FF7FB0' },
+  { id: 'off-2', label: '15% OFF', percent: 15, weight: 24, color: '#FFC24B' },
+  { id: 'off-3', label: '10% OFF', percent: 10, weight: 18, color: '#6FE0C2' },
+  { id: 'off-4', label: '20% OFF', percent: 20, weight: 14, color: '#9BD9FF' },
+  { id: 'off-5', label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
 ];
 
 /* ==================================================================
@@ -101,14 +95,15 @@ const SEGMENTS = [
 
 const SETTINGS_KEY = 'msf-tablet-settings-v1';
 const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
-const ALLOWED_PERCENTS = [...new Set(SEGMENTS.map((segment) => segment.percent))];
 
 const DEFAULT_SETTINGS = {
+  version: 3,
   upi: { id: 'milkshakefactory@upi', name: 'The Milkshake Factory' },
   qr: { mode: 'dynamic', image: '' },
   menu: {},
+  wheel: { segments: DEFAULT_WHEEL },
   spin: {
-    sequence: [10, 10, 15, 10, 20, 10, 25, 10, 15, 10],
+    sequence: ['off-1', 'off-3', 'off-2', 'off-1', 'off-4', 'off-3', 'off-5', 'off-1', 'off-2', 'off-1'],
     maxDiscount: 6000,
     minPayable: 3000,
   },
@@ -117,10 +112,13 @@ const DEFAULT_SETTINGS = {
 
 let SETTINGS = loadSettings();
 let MENU = [];
+let SEGMENTS = DEFAULT_WHEEL.map((segment) => ({ ...segment }));
 let RIGGED_SEQUENCE = [];
 let LIMITS = { maxDiscount: 6000, minPayable: 3000 };
 let adminImage = '';
 let adminUnlocked = false;
+let adminOffers = [];
+let adminSequence = [];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -139,8 +137,26 @@ function loadSettings() {
     if (raw.qr && ['dynamic', 'uploaded'].includes(raw.qr.mode)) base.qr.mode = raw.qr.mode;
     if (typeof raw.qr?.image === 'string' && raw.qr.image.startsWith('data:image/')) base.qr.image = raw.qr.image;
 
-    if (raw.spin && Array.isArray(raw.spin.sequence)) {
-      const sequence = raw.spin.sequence.map(Number).filter((percent) => ALLOWED_PERCENTS.includes(percent));
+    if (raw.version === DEFAULT_SETTINGS.version && raw.wheel && Array.isArray(raw.wheel.segments)) {
+      const segments = raw.wheel.segments
+        .filter((segment) => segment && typeof segment.id === 'string' && typeof segment.label === 'string')
+        .map((segment) => ({
+          id: segment.id.slice(0, 40),
+          label: segment.label.trim().slice(0, 24),
+          percent: Number(segment.percent),
+          weight: Number(segment.weight) > 0 ? Number(segment.weight) : 10,
+          color: /^#[0-9a-fA-F]{6}$/.test(segment.color) ? segment.color : '#FF7FB0',
+        }))
+        .filter(
+          (segment) =>
+            segment.id && segment.label && Number.isFinite(segment.percent) && segment.percent >= 0 && segment.percent <= 100,
+        );
+      if (segments.length >= 2) base.wheel.segments = segments;
+    }
+
+    if (raw.version === DEFAULT_SETTINGS.version && raw.spin && Array.isArray(raw.spin.sequence)) {
+      const offerIds = new Set(base.wheel.segments.map((segment) => segment.id));
+      const sequence = raw.spin.sequence.map(String).filter((id) => offerIds.has(id));
       if (sequence.length) base.spin.sequence = sequence.slice(0, 60);
     }
     if (Number.isFinite(Number(raw.spin?.maxDiscount)) && Number(raw.spin.maxDiscount) >= 0) {
@@ -151,19 +167,18 @@ function loadSettings() {
     }
     if (typeof raw.adminPin === 'string' && /^\d{4,8}$/.test(raw.adminPin)) base.adminPin = raw.adminPin;
 
-    if (raw.menu && typeof raw.menu === 'object') {
+    // Older saved settings used the removed dual (normal/spin) prices, so
+    // stale overrides are ignored and the new single-price defaults apply.
+    if (raw.version === DEFAULT_SETTINGS.version && raw.menu && typeof raw.menu === 'object') {
       for (const item of DEFAULT_MENU) {
         const override = raw.menu[item.id];
         if (
           override &&
           Number.isInteger(override.price) &&
           override.price > 0 &&
-          override.price <= 1_000_000 &&
-          Number.isInteger(override.spinPrice) &&
-          override.spinPrice >= override.price &&
-          override.spinPrice <= 1_000_000
+          override.price <= 1_000_000
         ) {
-          base.menu[item.id] = { price: override.price, spinPrice: override.spinPrice };
+          base.menu[item.id] = { price: override.price };
         }
       }
     }
@@ -176,13 +191,19 @@ function loadSettings() {
 function applySettings() {
   MENU = DEFAULT_MENU.map((item) => {
     const override = SETTINGS.menu[item.id];
-    return override ? { ...item, price: override.price, spinPrice: override.spinPrice } : { ...item };
+    return override ? { ...item, price: override.price } : { ...item };
   });
+  SEGMENTS = SETTINGS.wheel.segments.map((segment) => ({ ...segment }));
   RIGGED_SEQUENCE = SETTINGS.spin.sequence.slice();
   LIMITS = {
     maxDiscount: SETTINGS.spin.maxDiscount,
     minPayable: SETTINGS.spin.minPayable,
   };
+  if (wheel) {
+    wheel.destroy();
+    wheel = null;
+  }
+  renderPrizePreview();
   state.sequenceIndex = 0;
 }
 
@@ -208,7 +229,6 @@ const menuGrid = $('#menu-grid');
 const orderBar = $('#order-bar');
 const barCount = $('#bar-count');
 const barTotal = $('#bar-total');
-const barSpin = $('#bar-spin');
 const reviewBtn = $('#review-btn');
 const clearBtn = $('#clear-cart');
 const summaryLines = $('#summary-lines');
@@ -231,6 +251,8 @@ const pinError = $('#pin-error');
 const adminError = $('#admin-error');
 const adminQrPreview = $('#admin-qr-preview');
 const adminMenuRows = $('#admin-menu-rows');
+const adminOfferRows = $('#admin-offer-rows');
+const adminSequenceRows = $('#admin-sequence-rows');
 const toast = $('#toast');
 
 let wheel = null;
@@ -302,15 +324,6 @@ function cartTotal() {
   return total;
 }
 
-function spinCartTotal() {
-  let total = 0;
-  for (const [id, qty] of state.cart) {
-    const item = MENU.find((entry) => entry.id === id);
-    if (item) total += item.spinPrice * qty;
-  }
-  return total;
-}
-
 function lines() {
   return MENU.filter((item) => state.cart.has(item.id)).map((item) => {
     const qty = state.cart.get(item.id);
@@ -318,7 +331,6 @@ function lines() {
       ...item,
       qty,
       lineTotal: item.price * qty,
-      spinLine: item.spinPrice * qty,
     };
   });
 }
@@ -333,6 +345,21 @@ function conicGradient(segments) {
     return `${segment.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
   });
   return `conic-gradient(${stops.join(', ')})`;
+}
+
+function maxWheelPercent() {
+  return Math.max(0, ...SEGMENTS.map((segment) => segment.percent));
+}
+
+function renderPrizePreview() {
+  const preview = $('#prize-preview');
+  if (!preview) return;
+  preview.innerHTML = SEGMENTS.map(
+    (segment) =>
+      `<li><span class="prize-dot" style="background:${segment.color}"></span>${escapeHtml(segment.label)}</li>`,
+  ).join('');
+  const sticker = $('#wheel-sticker');
+  if (sticker) sticker.textContent = `UP TO ${maxWheelPercent()}% OFF`;
 }
 
 function discountFor(total, percent) {
@@ -380,10 +407,7 @@ function cardTemplate(item) {
       <div class="card-body">
         <div class="card-title-row">
           <h3>${item.name}</h3>
-          <div class="card-price-stack">
-            <span class="card-price">${money(item.price)}</span>
-            <span class="card-spin-price">Spin ${money(item.spinPrice)}</span>
-          </div>
+          <span class="card-price">${money(item.price)}</span>
         </div>
         <p class="card-desc">${item.desc}</p>
         <div class="card-controls" data-controls>${controlsFor(item)}</div>
@@ -398,7 +422,7 @@ function promoWideTemplate() {
       <div>
         <span class="eyebrow">Every order gets one spin</span>
         <h3>SPIN &amp; WIN</h3>
-        <p>Win up to 25% off the Spin &amp; Win total. One spin, instantly applied.</p>
+        <p>Win up to ${maxWheelPercent()}% off your total. One spin, instantly applied.</p>
       </div>
     </article>`;
 }
@@ -459,12 +483,10 @@ function renderAllCards() {
 function renderBar() {
   const count = countItems();
   const total = cartTotal();
-  const spinTotal = spinCartTotal();
   barCount.textContent = count
     ? `${count} drink${count === 1 ? '' : 's'} in this order`
     : 'Tap a drink to start';
   barTotal.textContent = money(total);
-  if (barSpin) barSpin.textContent = count ? `Spin ${money(spinTotal)}` : '';
   reviewBtn.disabled = count === 0;
   clearBtn.hidden = count === 0;
 }
@@ -543,14 +565,13 @@ function lineTemplate(item) {
       </div>
       <div class="line-price">
         <strong>${money(item.lineTotal)}</strong>
-        <small>${money(item.price)} each · spin ${money(item.spinPrice)}</small>
+        <small>${money(item.price)} each</small>
       </div>
     </article>`;
 }
 
 function totalCardTemplate() {
-  const normal = cartTotal();
-  const spinBase = spinCartTotal();
+  const total = cartTotal();
   const count = countItems();
   const spin = state.spin;
 
@@ -558,10 +579,9 @@ function totalCardTemplate() {
     return `
       <span class="total-label">Amount to pay</span>
       <strong class="total-amount">${money(spin.final)}</strong>
-      <span class="total-sub">${spin.percent}% off the Spin &amp; Win total</span>
+      <span class="total-sub">${spin.percent}% off your total</span>
       <div class="total-rule"></div>
-      <div class="discline"><span>Normal total</span><strong>${money(spin.normalTotal)}</strong></div>
-      <div class="discline"><span>Spin &amp; Win starting total</span><strong>${money(spin.total)}</strong></div>
+      <div class="discline"><span>Order total</span><strong>${money(spin.total)}</strong></div>
       <div class="discline is-discount"><span>Spin &amp; Win · ${spin.percent}% OFF</span><strong>− ${money(spin.discount)}</strong></div>
       <div class="discline"><span>You pay</span><strong>${money(spin.final)}</strong></div>
       <div class="spin-done">
@@ -572,7 +592,7 @@ function totalCardTemplate() {
           </div>
           <span class="chip-mint">${icon('check')} −${money(spin.discount)}</span>
         </div>
-        <p>Discount applied to the Spin &amp; Win total. The normal price would have been ${money(spin.normalTotal)}.</p>
+        <p>Discount applied to your order total.</p>
         <button class="btn btn-primary pay-now" type="button" data-pay>
           Pay ${money(spin.final)} ${icon('arrow')}
         </button>
@@ -585,28 +605,21 @@ function totalCardTemplate() {
 
   return `
     <span class="total-label">Your total</span>
-    <strong class="total-amount">${money(normal)}</strong>
-    <span class="total-sub">${count} drink${count === 1 ? '' : 's'} · normal price</span>
+    <strong class="total-amount">${money(total)}</strong>
+    <span class="total-sub">${count} drink${count === 1 ? '' : 's'}</span>
     <div class="total-rule"></div>
-    <div class="spin-base-row">
-      <span>Spin &amp; Win starting total</span>
-      <strong>${money(spinBase)}</strong>
-    </div>
-    <p class="spin-base-note">
-      That's ${money(spinBase - normal)} more for the spin — the discount applies to ${money(spinBase)}.
-    </p>
     <div class="spin-nudge">
       <div class="spin-nudge-top">
         <span class="nudge-wheel" style="background:${conicGradient(SEGMENTS)}" aria-hidden="true"></span>
         <div>
           <h3>Feeling lucky?</h3>
-          <p>Win up to 25% off the Spin &amp; Win total.</p>
+          <p>Win up to ${maxWheelPercent()}% off your total.</p>
         </div>
       </div>
       <button class="btn spin-btn-main" type="button" data-open-wheel>
         ${icon('wheel')} SPIN &amp; WIN
       </button>
-      <button class="skip-spin" type="button" data-pay>Pay normal ${money(normal)} without spinning →</button>
+      <button class="skip-spin" type="button" data-pay>Pay ${money(total)} without spinning →</button>
     </div>
     <p class="total-foot">One spin per order · discount applied instantly</p>`;
 }
@@ -689,15 +702,14 @@ function renderPay() {
     return;
   }
 
-  const normal = cartTotal();
-  const spinBase = spinCartTotal();
-  const spin = state.spin && state.spin.total === spinBase ? state.spin : null;
-  const final = spin ? spin.final : normal;
+  const total = cartTotal();
+  const spin = state.spin && state.spin.total === total ? state.spin : null;
+  const final = spin ? spin.final : total;
 
   $('#pay-amount').textContent = money(final);
   $('#pay-note').textContent = spin
-    ? `${spin.percent}% off the Spin & Win total`
-    : 'Normal price · no spin';
+    ? `${spin.percent}% off your total`
+    : 'No spin discount';
   $('#pay-upi').textContent = SETTINGS.upi.id;
   $('#qr-amount').textContent = money(final);
   const paySub = $('#pay-sub');
@@ -710,8 +722,7 @@ function renderPay() {
 
   let breakdown = '';
   if (spin) {
-    breakdown += `<div class="discline"><span>Normal total</span><strong>${money(normal)}</strong></div>`;
-    breakdown += `<div class="discline"><span>Spin &amp; Win starting total</span><strong>${money(spinBase)}</strong></div>`;
+    breakdown += `<div class="discline"><span>Order total</span><strong>${money(total)}</strong></div>`;
     breakdown += `<div class="discline is-discount"><span>Spin &amp; Win · ${spin.percent}% OFF</span><strong>− ${money(spin.discount)}</strong></div>`;
     breakdown += `<div class="discline"><span>Amount to pay</span><strong>${money(final)}</strong></div>`;
   } else {
@@ -750,12 +761,9 @@ function ensureWheel() {
 }
 
 function updateWheelTotals() {
-  const normal = cartTotal();
-  const spinBase = spinCartTotal();
-  const normalEl = $('#wheel-normal');
-  const spinEl = $('#wheel-spin');
-  if (normalEl) normalEl.textContent = money(normal);
-  if (spinEl) spinEl.textContent = money(spinBase);
+  const total = cartTotal();
+  const totalEl = $('#wheel-total');
+  if (totalEl) totalEl.textContent = money(total);
 }
 
 function openWheel() {
@@ -785,13 +793,12 @@ function closeWheel() {
 }
 
 function pickRiggedResult() {
-  const percent = RIGGED_SEQUENCE[state.sequenceIndex % RIGGED_SEQUENCE.length];
+  if (!RIGGED_SEQUENCE.length || !SEGMENTS.length) return { percent: 0, index: 0 };
+  const offerId = RIGGED_SEQUENCE[state.sequenceIndex % RIGGED_SEQUENCE.length];
   state.sequenceIndex += 1;
-  const candidates = SEGMENTS.map((segment, index) => (segment.percent === percent ? index : -1)).filter(
-    (index) => index >= 0,
-  );
-  const pool = candidates.length ? candidates : [0];
-  return { percent, index: pool[Math.floor(Math.random() * pool.length)] };
+  let index = SEGMENTS.findIndex((segment) => segment.id === offerId);
+  if (index < 0) index = 0;
+  return { percent: SEGMENTS[index].percent, index };
 }
 
 function showResult(spin, { restore = false } = {}) {
@@ -811,10 +818,9 @@ function showResult(spin, { restore = false } = {}) {
     <div class="result-badge">${icon('sparkle')}</div>
     <span class="result-kicker">${kicker}</span>
     <h3>${spin.percent}% OFF</h3>
-    <p class="result-copy">That's ${money(spin.discount)} off the Spin &amp; Win total.</p>
+    <p class="result-copy">That's ${money(spin.discount)} off your total.</p>
     <div class="result-lines">
-      <div class="discline"><span>Normal total</span><strong>${money(spin.normalTotal)}</strong></div>
-      <div class="discline"><span>Spin &amp; Win total</span><strong>${money(spin.total)}</strong></div>
+      <div class="discline"><span>Order total</span><strong>${money(spin.total)}</strong></div>
       <div class="discline is-discount"><span>Discount · ${spin.percent}% OFF</span><strong>− ${money(spin.discount)}</strong></div>
       <div class="discline is-final"><span>You pay</span><strong>${money(spin.final)}</strong></div>
     </div>
@@ -836,8 +842,7 @@ async function doSpin() {
   if (spinning || state.spin) return;
   if (!countItems()) return;
 
-  const normalTotal = cartTotal();
-  const spinBase = spinCartTotal();
+  const total = cartTotal();
   const rigged = pickRiggedResult();
 
   spinning = true;
@@ -853,12 +858,11 @@ async function doSpin() {
 
   try {
     await wheel.spinToIndex(rigged.index);
-    const { discount, final } = discountFor(spinBase, rigged.percent);
+    const { discount, final } = discountFor(total, rigged.percent);
     state.spin = {
       percent: rigged.percent,
       index: rigged.index,
-      total: spinBase,
-      normalTotal,
+      total,
       discount,
       final,
       at: Date.now(),
@@ -945,12 +949,15 @@ function populateAdminForm() {
   $('#admin-upi-id').value = SETTINGS.upi.id;
   $('#admin-upi-name').value = SETTINGS.upi.name;
   $('#admin-qr-mode').value = SETTINGS.qr.mode;
-  $('#admin-sequence').value = SETTINGS.spin.sequence.join(', ');
   $('#admin-max').value = SETTINGS.spin.maxDiscount / 100;
   $('#admin-min').value = SETTINGS.spin.minPayable / 100;
   $('#admin-new-pin').value = '';
   adminImage = SETTINGS.qr.image || '';
+  adminOffers = SETTINGS.wheel.segments.map((offer) => ({ ...offer }));
+  adminSequence = SETTINGS.spin.sequence.slice();
   renderAdminMenuRows();
+  renderAdminOffers();
+  renderAdminSequence();
   renderAdminQrPreview();
 }
 
@@ -964,21 +971,127 @@ function renderAdminMenuRows() {
         type="number"
         min="1"
         step="1"
-        data-price="normal"
+        data-price="price"
         value="${item.price / 100}"
-        aria-label="${escapeHtml(item.name)} normal price"
-      />
-      <input
-        class="admin-input"
-        type="number"
-        min="1"
-        step="1"
-        data-price="spin"
-        value="${item.spinPrice / 100}"
-        aria-label="${escapeHtml(item.name)} spin price"
+        aria-label="${escapeHtml(item.name)} price"
       />
     </div>`,
   ).join('');
+}
+
+function newOfferId() {
+  let id;
+  do {
+    id = `off-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  } while (adminOffers.some((offer) => offer.id === id));
+  return id;
+}
+
+function readAdminOffers() {
+  const weights = new Map(adminOffers.map((offer) => [offer.id, offer.weight]));
+  return $$('.admin-offer-row', adminOfferRows).map((row) => {
+    const id = row.dataset.offerId;
+    return {
+      id,
+      label: row.querySelector('[data-offer="label"]').value.trim(),
+      percent: Number(row.querySelector('[data-offer="percent"]').value),
+      color: row.querySelector('[data-offer="color"]').value,
+      weight: weights.get(id) || 10,
+    };
+  });
+}
+
+function readAdminSequence() {
+  return $$('[data-sequence-select]', adminSequenceRows).map((select) => select.value);
+}
+
+function renderAdminOffers() {
+  adminOfferRows.innerHTML = adminOffers
+    .map(
+      (offer) => `
+    <div class="admin-offer-row" data-offer-id="${escapeHtml(offer.id)}">
+      <input
+        class="admin-input"
+        type="text"
+        data-offer="label"
+        maxlength="24"
+        value="${escapeHtml(offer.label)}"
+        aria-label="Offer label"
+      />
+      <div class="admin-percent">
+        <input
+          class="admin-input"
+          type="number"
+          data-offer="percent"
+          min="0"
+          max="100"
+          step="1"
+          value="${offer.percent}"
+          aria-label="Discount percent"
+        />
+        <span>%</span>
+      </div>
+      <input class="admin-color" type="color" data-offer="color" value="${escapeHtml(offer.color)}" aria-label="Offer colour" />
+      <button class="remove-line" type="button" data-remove-offer="${escapeHtml(offer.id)}" aria-label="Remove offer">
+        ${icon('trash')}
+      </button>
+    </div>`,
+    )
+    .join('');
+}
+
+function renderAdminSequence() {
+  if (!adminOffers.length) {
+    adminSequenceRows.innerHTML = '<p class="admin-hint">Add an offer first.</p>';
+    return;
+  }
+  const ids = new Set(adminOffers.map((offer) => offer.id));
+  adminSequence = adminSequence.filter((id) => ids.has(id));
+  if (!adminSequence.length) adminSequence = [adminOffers[0].id];
+
+  adminSequenceRows.innerHTML = adminSequence
+    .map(
+      (id, index) => `
+    <div class="admin-sequence-row">
+      <span class="admin-seq-index">${index + 1}</span>
+      <select class="admin-input" data-sequence-select aria-label="Offer for spin ${index + 1}">
+        ${adminOffers
+          .map(
+            (offer) =>
+              `<option value="${escapeHtml(offer.id)}"${offer.id === id ? ' selected' : ''}>${escapeHtml(offer.label)} · ${offer.percent}%</option>`,
+          )
+          .join('')}
+      </select>
+      <button class="remove-line" type="button" data-remove-sequence="${index}" aria-label="Remove spin ${index + 1}">
+        ${icon('trash')}
+      </button>
+    </div>`,
+    )
+    .join('');
+}
+
+function addAdminOffer() {
+  adminOffers = readAdminOffers();
+  adminSequence = readAdminSequence();
+  const totalWeight = adminOffers.reduce((sum, offer) => sum + (offer.weight || 10), 0);
+  const weight = adminOffers.length ? Math.round(totalWeight / adminOffers.length) : 10;
+  adminOffers.push({
+    id: newOfferId(),
+    label: '10% OFF',
+    percent: 10,
+    color: OFFER_COLORS[adminOffers.length % OFFER_COLORS.length],
+    weight,
+  });
+  renderAdminOffers();
+  renderAdminSequence();
+}
+
+function addAdminSequenceStep() {
+  adminOffers = readAdminOffers();
+  adminSequence = readAdminSequence();
+  if (!adminOffers.length) return;
+  adminSequence.push(adminOffers[0].id);
+  renderAdminSequence();
 }
 
 function renderAdminQrPreview() {
@@ -1052,10 +1165,8 @@ function saveAdminSettings(event) {
   const upiId = $('#admin-upi-id').value.trim();
   const upiName = $('#admin-upi-name').value.trim();
   const qrMode = $('#admin-qr-mode').value;
-  const sequence = $('#admin-sequence')
-    .value.split(',')
-    .map((part) => Number(part.trim()))
-    .filter((value) => Number.isFinite(value));
+  const offers = readAdminOffers();
+  const sequence = readAdminSequence();
   const maxDiscount = Math.round(Number($('#admin-max').value) * 100);
   const minPayable = Math.round(Number($('#admin-min').value) * 100);
   const newPin = $('#admin-new-pin').value.trim();
@@ -1072,8 +1183,28 @@ function saveAdminSettings(event) {
     adminError.textContent = 'Upload a QR photo, or choose the generated QR.';
     return;
   }
-  if (!sequence.length || sequence.length > 60 || sequence.some((value) => !ALLOWED_PERCENTS.includes(value))) {
-    adminError.textContent = `Prize sequence must use only ${ALLOWED_PERCENTS.join(', ')}.`;
+  if (offers.length < 2) {
+    adminError.textContent = 'Add at least two wheel offers.';
+    return;
+  }
+  if (offers.length > 16) {
+    adminError.textContent = 'Keep the wheel to 16 offers or fewer.';
+    return;
+  }
+  for (const offer of offers) {
+    if (!offer.label || offer.label.length > 24) {
+      adminError.textContent = 'Each offer needs a label of 1–24 characters.';
+      return;
+    }
+    if (!Number.isFinite(offer.percent) || offer.percent < 0 || offer.percent > 100) {
+      adminError.textContent = `"${offer.label}": enter a discount between 0 and 100.`;
+      return;
+    }
+  }
+  const offerIds = new Set(offers.map((offer) => offer.id));
+  const steps = sequence.filter((id) => offerIds.has(id));
+  if (!steps.length || steps.length > 60) {
+    adminError.textContent = `Add between 1 and 60 steps to the spin sequence.`;
     return;
   }
   if (!Number.isFinite(maxDiscount) || maxDiscount < 0 || maxDiscount > 1_000_000) {
@@ -1094,25 +1225,22 @@ function saveAdminSettings(event) {
     const id = row.dataset.menuId;
     const item = DEFAULT_MENU.find((entry) => entry.id === id);
     if (!item) continue;
-    const normal = Math.round(Number(row.querySelector('[data-price="normal"]').value) * 100);
-    const spin = Math.round(Number(row.querySelector('[data-price="spin"]').value) * 100);
+    const price = Math.round(Number(row.querySelector('[data-price="price"]').value) * 100);
 
-    if (!Number.isFinite(normal) || normal <= 0 || normal > 1_000_000) {
-      adminError.textContent = `${item.name}: enter a valid normal price.`;
+    if (!Number.isFinite(price) || price <= 0 || price > 1_000_000) {
+      adminError.textContent = `${item.name}: enter a valid price.`;
       return;
     }
-    if (!Number.isFinite(spin) || spin < normal || spin > 1_000_000) {
-      adminError.textContent = `${item.name}: the spin price must be at least the normal price.`;
-      return;
-    }
-    menu[id] = { price: normal, spinPrice: spin };
+    menu[id] = { price };
   }
 
   const next = {
+    version: DEFAULT_SETTINGS.version,
     upi: { id: upiId, name: upiName },
     qr: { mode: qrMode, image: adminImage },
     menu,
-    spin: { sequence, maxDiscount, minPayable },
+    wheel: { segments: offers },
+    spin: { sequence: steps, maxDiscount, minPayable },
     adminPin: newPin || SETTINGS.adminPin,
   };
 
@@ -1299,6 +1427,29 @@ $('#admin-qr-remove').addEventListener('click', () => {
   adminError.textContent = '';
 });
 
+$('#admin-add-offer').addEventListener('click', addAdminOffer);
+$('#admin-add-sequence').addEventListener('click', addAdminSequenceStep);
+
+adminOfferRows.addEventListener('click', (event) => {
+  const remove = event.target.closest('[data-remove-offer]');
+  if (!remove) return;
+  adminOffers = readAdminOffers();
+  adminSequence = readAdminSequence();
+  const id = remove.dataset.removeOffer;
+  adminOffers = adminOffers.filter((offer) => offer.id !== id);
+  adminSequence = adminSequence.filter((offerId) => offerId !== id);
+  renderAdminOffers();
+  renderAdminSequence();
+});
+
+adminSequenceRows.addEventListener('click', (event) => {
+  const remove = event.target.closest('[data-remove-sequence]');
+  if (!remove) return;
+  adminSequence = readAdminSequence();
+  adminSequence.splice(Number(remove.dataset.removeSequence), 1);
+  renderAdminSequence();
+});
+
 $('#admin-reset').addEventListener('click', resetAdminSettings);
 
 $('#close-wheel').addEventListener('click', closeWheel);
@@ -1383,11 +1534,6 @@ function boot() {
   applySettings();
   $('#brand-mark').innerHTML = logoMark();
   updateMuteButton();
-
-  $('#prize-preview').innerHTML = SEGMENTS.map(
-    (segment) =>
-      `<li><span class="prize-dot" style="background:${segment.color}"></span>${segment.label}</li>`,
-  ).join('');
 
   renderMenu();
   showScreen('menu');

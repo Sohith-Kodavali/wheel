@@ -205,7 +205,6 @@
             <span class="bar-count" id="bar-count">Tap a drink to start</span>
             <div class="bar-total-row">
               <strong class="bar-total" id="bar-total">₹0</strong>
-              <span class="bar-spin" id="bar-spin"></span>
             </div>
           </div>
         </div>
@@ -270,12 +269,11 @@
 
           <aside class="wheel-panel">
             <div class="wheel-intro" id="wheel-intro">
-              <span class="sticker">UP TO 25% OFF</span>
+              <span class="sticker" id="wheel-sticker">UP TO 25% OFF</span>
               <h3>One spin.<br />Instant discount.</h3>
-              <p>Every spin wins. Your discount is applied to the Spin &amp; Win total, not the normal total.</p>
+              <p>Every spin wins. Your discount is applied to your order total.</p>
               <div class="wheel-totals">
-                <div><span>Normal total</span><strong id="wheel-normal">₹0</strong></div>
-                <div class="is-spin"><span>Spin &amp; Win starting</span><strong id="wheel-spin">₹0</strong></div>
+                <div class="is-spin"><span>Your total</span><strong id="wheel-total">₹0</strong></div>
               </div>
               <ul class="prize-preview" id="prize-preview"></ul>
               <span class="fine-print">One spin per order · discount capped at ₹60</span>
@@ -372,23 +370,37 @@
               <h3>Menu prices</h3>
               <div class="admin-menu-head">
                 <span>Drink</span>
-                <span>Normal ₹</span>
-                <span>Spin ₹</span>
+                <span>Price ₹</span>
               </div>
               <div id="admin-menu-rows"></div>
-              <p class="admin-hint">Prices are in rupees. The Spin price must be equal to or higher than normal.</p>
+              <p class="admin-hint">Prices are in rupees.</p>
             </section>
 
             <section class="admin-section">
-              <h3>Spin &amp; Win</h3>
-              <label class="admin-field">
-                Rigged prize sequence
-                <input class="admin-input" id="admin-sequence" type="text" placeholder="10, 10, 15, 10, 20" />
-                <span class="admin-hint">
-                  Comma-separated. Allowed values are 10, 15, 20 and 25. Each spin takes the next value.
-                </span>
-              </label>
-              <div class="admin-grid">
+              <h3>Wheel offers</h3>
+              <p class="admin-hint">These are the slices on the wheel. Add, edit or remove offers.</p>
+              <div class="admin-offer-head">
+                <span>Label</span>
+                <span>Discount</span>
+                <span>Colour</span>
+                <span></span>
+              </div>
+              <div id="admin-offer-rows"></div>
+              <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-offer">
+                + Add offer
+              </button>
+            </section>
+
+            <section class="admin-section">
+              <h3>Spin sequence</h3>
+              <p class="admin-hint">
+                The wheel lands on these offers in order, one per spin, then repeats. Add a step for each spin.
+              </p>
+              <div id="admin-sequence-rows"></div>
+              <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-sequence">
+                + Add step
+              </button>
+              <div class="admin-grid admin-limits">
                 <label class="admin-field">
                   Max discount ₹
                   <input class="admin-input" id="admin-max" type="number" min="0" step="1" />
