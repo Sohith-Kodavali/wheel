@@ -2764,7 +2764,7 @@ svg {
 .admin-offer-head,
 .admin-offer-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px 56px 40px;
+  grid-template-columns: minmax(0, 1fr) 92px 78px 56px 40px;
   gap: 10px;
   align-items: center;
 }
@@ -2820,6 +2820,29 @@ svg {
   min-height: 40px;
   padding: 8px 14px;
   font-size: 0.78rem;
+}
+
+.admin-offer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.admin-offer-foot .admin-add-btn {
+  margin-top: 0;
+}
+
+.admin-wheel-total {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: var(--ink-muted);
+}
+
+.admin-wheel-total.is-off {
+  color: #b01238;
 }
 
 .admin-sequence-row {
@@ -2956,8 +2979,8 @@ svg {
 
   .admin-offer-head,
   .admin-offer-row {
-    grid-template-columns: minmax(0, 1fr) 72px 44px 30px;
-    gap: 6px;
+    grid-template-columns: minmax(0, 1fr) 58px 54px 38px 28px;
+    gap: 4px;
   }
 
   .admin-offer-row .admin-input {

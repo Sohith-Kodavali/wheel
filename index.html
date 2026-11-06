@@ -378,17 +378,24 @@
 
             <section class="admin-section">
               <h3>Wheel offers</h3>
-              <p class="admin-hint">These are the slices on the wheel. Add, edit or remove offers.</p>
+              <p class="admin-hint">
+                Discount % is what the customer pays. Wheel % is how much of the wheel that slice takes.
+                Sizes are scaled to fill the whole wheel.
+              </p>
               <div class="admin-offer-head">
                 <span>Label</span>
                 <span>Discount</span>
+                <span>Wheel %</span>
                 <span>Colour</span>
                 <span></span>
               </div>
               <div id="admin-offer-rows"></div>
-              <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-offer">
-                + Add offer
-              </button>
+              <div class="admin-offer-foot">
+                <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-offer">
+                  + Add offer
+                </button>
+                <span class="admin-wheel-total" id="admin-wheel-total">Wheel total: 100%</span>
+              </div>
             </section>
 
             <section class="admin-section">

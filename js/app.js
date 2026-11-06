@@ -996,24 +996,37 @@ function newOfferId() {
 }
 
 function readAdminOffers() {
-  const weights = new Map(adminOffers.map((offer) => [offer.id, offer.weight]));
   return $$('.admin-offer-row', adminOfferRows).map((row) => {
     const id = row.dataset.offerId;
     const percent = Number(row.querySelector('[data-offer="percent"]').value);
     const label = row.querySelector('[data-offer="label"]').value.trim();
     const standardLabel = /^\d+(?:\.\d+)?%\s*OFF$/i.test(label);
+    const weight = Number(row.querySelector('[data-offer="weight"]').value);
     return {
       id,
       label: standardLabel && Number.isFinite(percent) ? `${percent}% OFF` : label,
       percent,
       color: row.querySelector('[data-offer="color"]').value,
-      weight: weights.get(id) || 10,
+      weight: Number.isFinite(weight) ? weight : 0,
     };
   });
 }
 
 function readAdminSequence() {
   return $$('[data-sequence-select]', adminSequenceRows).map((select) => select.value);
+}
+
+function updateWheelTotal() {
+  const total = $$('[data-offer="weight"]', adminOfferRows).reduce(
+    (sum, input) => sum + (Number(input.value) || 0),
+    0,
+  );
+  const element = $('#admin-wheel-total');
+  if (!element) return;
+  const rounded = Math.round(total * 10) / 10;
+  const scaled = Math.abs(rounded - 100) > 0.5;
+  element.textContent = scaled ? `Wheel total: ${rounded}% · scaled to fit` : 'Wheel total: 100%';
+  element.classList.toggle('is-off', scaled);
 }
 
 function renderAdminOffers() {
@@ -1042,6 +1055,15 @@ function renderAdminOffers() {
         />
         <span>%</span>
       </div>
+      <input
+        class="admin-input"
+        type="number"
+        data-offer="weight"
+        min="1"
+        step="1"
+        value="${offer.weight}"
+        aria-label="Wheel percentage"
+      />
       <input class="admin-color" type="color" data-offer="color" value="${escapeHtml(offer.color)}" aria-label="Offer colour" />
       <button class="remove-line" type="button" data-remove-offer="${escapeHtml(offer.id)}" aria-label="Remove offer">
         ${icon('trash')}
@@ -1049,6 +1071,7 @@ function renderAdminOffers() {
     </div>`,
     )
     .join('');
+  updateWheelTotal();
 }
 
 function renderAdminSequence() {
@@ -1084,14 +1107,12 @@ function renderAdminSequence() {
 function addAdminOffer() {
   adminOffers = readAdminOffers();
   adminSequence = readAdminSequence();
-  const totalWeight = adminOffers.reduce((sum, offer) => sum + (offer.weight || 10), 0);
-  const weight = adminOffers.length ? Math.round(totalWeight / adminOffers.length) : 10;
   adminOffers.push({
     id: newOfferId(),
     label: '10% OFF',
     percent: 10,
     color: OFFER_COLORS[adminOffers.length % OFFER_COLORS.length],
-    weight,
+    weight: 10,
   });
   renderAdminOffers();
   renderAdminSequence();
@@ -1211,7 +1232,16 @@ function saveAdminSettings(event) {
       adminError.textContent = `"${offer.label}": enter a discount between 0 and 100.`;
       return;
     }
+    if (!Number.isFinite(offer.weight) || offer.weight <= 0) {
+      adminError.textContent = `"${offer.label}": set a wheel size above 0.`;
+      return;
+    }
   }
+  const totalWeight = offers.reduce((sum, offer) => sum + offer.weight, 0);
+  const normalizedOffers = offers.map((offer) => ({
+    ...offer,
+    weight: Math.max(0.1, Math.round((offer.weight / totalWeight) * 1000) / 10),
+  }));
   const offerIds = new Set(offers.map((offer) => offer.id));
   const steps = sequence.filter((id) => offerIds.has(id));
   if (!steps.length || steps.length > 60) {
@@ -1250,7 +1280,7 @@ function saveAdminSettings(event) {
     upi: { id: upiId, name: upiName },
     qr: { mode: qrMode, image: adminImage },
     menu,
-    wheel: { segments: offers },
+    wheel: { segments: normalizedOffers },
     spin: { sequence: steps, maxDiscount, minPayable },
     adminPin: newPin || SETTINGS.adminPin,
   };
@@ -1456,7 +1486,9 @@ adminOfferRows.addEventListener('input', (event) => {
   if (event.target === label) {
     const match = label.value.trim().match(/^(\d+(?:\.\d+)?)%\s*OFF$/i);
     if (match) percent.value = String(Number(match[1]));
+    return;
   }
+  if (event.target.matches('[data-offer="weight"]')) updateWheelTotal();
 });
 
 adminOfferRows.addEventListener('change', () => {

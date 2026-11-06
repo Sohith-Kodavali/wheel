@@ -39,7 +39,7 @@ You can change:
 - **The UPI QR photo** — upload a PNG/JPG/WebP of the stall's scanner. It is resized locally and saved as a data URL in the browser.
 - **QR mode on the payment screen** — use the uploaded stall QR, or the generated QR that already contains the exact amount.
 - **Menu prices** — one price for every drink.
-- **Wheel offers** — add, edit or remove the slices on the wheel (label, discount and colour).
+- **Wheel offers** — add, edit or remove the slices on the wheel (label, discount, wheel share and colour).
 - **Spin sequence** — a separate ordered list of offers that decides what each spin lands on, plus the max-discount / minimum-payable limits.
 - **Admin PIN** (4–8 digits).
 
@@ -58,7 +58,7 @@ If the PIN is forgotten, clear the site's localStorage/history for the page; the
 The admin panel overrides the fallbacks in `js/app.js`. The default menu, prices, wheel offers and spin sequence live at the top of that file in `DEFAULT_MENU`, `DEFAULT_WHEEL` and `DEFAULT_SETTINGS`.
 
 - **Rigging:** the wheel does not use random probabilities. Each spin takes the next offer from the saved sequence and stops on that slice. Every spin wins. Both the offers and the sequence are edited from the admin panel.
-- **Wheel area:** offers keep their internal `weight`, which sets the slice size. New offers get the average weight of the existing ones.
+- **Wheel area:** each offer has a **Wheel %** that sets its slice size. The admin shows the running total and scales the slices to fill the wheel when you save.
 - **Discount:** taken from the order total, then capped by the max discount and minimum payable settings.
 - **Prices and menu:** every item has a single `price` in paise (`7500` = ₹75). The admin panel edits the live prices; the defaults are in `DEFAULT_MENU`.
 
