@@ -3,7 +3,7 @@
 A deliberately small kiosk for the stall tablet. Three screens only:
 
 1. **Menu** — tap drinks to add them.
-2. **Total + Spin & Win** — review the order, spin the rigged wheel for a discount, or pay without spinning.
+2. **Total + Spin & Win** — review the order; on ₹100+ orders spin the rigged wheel for a discount or pay without spinning. Under ₹100 it goes straight to payment.
 3. **Pay** — a UPI QR for the exact amount.
 
 No admin panel, no database, no order history, no backend. Everything is plain HTML, CSS and JavaScript. The QR is generated in the browser from the configured UPI ID and the exact payable amount.
@@ -59,6 +59,7 @@ The admin panel overrides the fallbacks in `js/app.js`. The default menu, prices
 
 - **Rigging:** the wheel does not use random probabilities. Each spin takes the next offer from the saved sequence and stops on that slice. Every spin wins. Both the offers and the sequence are edited from the admin panel.
 - **Wheel area:** each offer has a **Wheel %** that sets its slice size. The admin shows the running total and scales the slices to fill the wheel when you save.
+- **Spin minimum:** the wheel unlocks at ₹100. Below that the bottom bar shows how much more is needed, and the total screen goes straight to payment.
 - **Discount:** taken from the order total, then capped by the max discount and minimum payable settings.
 - **Prices and menu:** every item has a single `price` in paise (`7500` = ₹75). The admin panel edits the live prices; the defaults are in `DEFAULT_MENU`.
 
@@ -70,8 +71,8 @@ The admin panel overrides the fallbacks in `js/app.js`. The default menu, prices
 | Mojitos (Cuban Mint / Lime / Blue) | ₹39 |
 | Cold Coffee | ₹65 |
 
-- **Pay without spinning** → the customer pays the order total.
-- **Spin & Win** → the discount is calculated on the order total.
+- **Under ₹100** → no wheel; the total screen continues straight to payment.
+- **₹100 or more** → the customer can spin for a discount on the order total, or pay without spinning.
 
 The menu cards, bottom bar, summary and payment screen show that single price.
 
@@ -89,7 +90,7 @@ A win triggers the weighted wheel, confetti, a radial spark/coin blast, a gold f
 - The menu is split into three sections — **Milkshakes**, **Mojitos** and **Cold Coffee** — with a live total bar and a **Clear** button. It is locked to the tablet screen and does not scroll between sections.
 - Every card shows the drink's single price.
 - Tapping a drink (or its Add button) adds one. The stepper changes quantities. Max 20 per drink.
-- **Review order** opens the total screen. The total screen shows the order total, a **Spin & Win** button, and a **Pay ₹X without spinning** link.
+- **Review order** opens the total screen. On ₹100+ orders it shows a **Spin & Win** button and a **Pay ₹X without spinning** link. Under ₹100 it shows how much more unlocks the spin and a **Continue to payment** button instead.
 - The wheel overlay is a weighted canvas wheel with real deceleration, tick sounds, mute, confetti, a spark/coin blast, a flash, screen shake, haptics, and a result panel.
 - The result is locked for the order. Changing the order clears it and returns to the full order total.
 - After spinning, **Pay ₹X** goes straight to the QR. The QR encodes the exact discounted amount, and the payment screen lists order total → discount → final.

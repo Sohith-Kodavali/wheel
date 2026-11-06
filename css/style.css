@@ -1094,6 +1094,21 @@ svg {
   flex-wrap: wrap;
 }
 
+.bar-unlock {
+  font-size: 0.66rem;
+  font-weight: 900;
+  color: var(--pink-deep);
+  background: var(--pink-tint);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.bar-unlock.is-unlocked {
+  color: var(--mint-deep);
+  background: var(--mint-soft);
+}
+
 .bar-actions {
   display: flex;
   align-items: center;
@@ -1457,6 +1472,26 @@ svg {
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
   border-top: 13px solid var(--pink-deep);
+}
+
+.nudge-wheel.is-locked {
+  filter: grayscale(0.7);
+  opacity: 0.55;
+  animation-play-state: paused;
+}
+
+.spin-nudge-locked {
+  background: linear-gradient(145deg, #fff7ec, #f3eadc);
+  border-color: #e6dccd;
+}
+
+.spin-nudge-locked h3 {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.spin-nudge-locked p {
+  color: var(--ink-muted);
 }
 
 .spin-btn-main {

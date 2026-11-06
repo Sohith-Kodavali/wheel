@@ -89,7 +89,7 @@
         <div class="steps" id="steps" aria-label="Order progress">
           <span class="step is-active" data-step="menu"><b>1</b> Menu</span>
           <span class="step-line"></span>
-          <span class="step" data-step="summary"><b>2</b> Total &amp; Spin</span>
+          <span class="step" data-step="summary"><b>2</b> <span id="step-summary-label">Total &amp; Spin</span></span>
           <span class="step-line"></span>
           <span class="step" data-step="pay"><b>3</b> Pay</span>
         </div>
@@ -134,7 +134,7 @@
               <div class="summary-title">
                 <span class="eyebrow">Step 2</span>
                 <h1>Your order.</h1>
-                <p>Check the drinks, then spin for a discount or pay as is.</p>
+                <p id="summary-sub">Check the drinks, then spin for a discount or pay as is.</p>
               </div>
             </div>
 
@@ -205,6 +205,7 @@
             <span class="bar-count" id="bar-count">Tap a drink to start</span>
             <div class="bar-total-row">
               <strong class="bar-total" id="bar-total">₹0</strong>
+              <span class="bar-unlock" id="bar-unlock" hidden></span>
             </div>
           </div>
         </div>

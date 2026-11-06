@@ -89,6 +89,8 @@ const DEFAULT_WHEEL = [
   { id: 'off-5', label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
 ];
 
+const SPIN_MIN_TOTAL = 10000;
+
 /* ==================================================================
    LOCAL SETTINGS — persisted in this tablet's localStorage
    ================================================================== */
@@ -237,6 +239,7 @@ const menuGrid = $('#menu-grid');
 const orderBar = $('#order-bar');
 const barCount = $('#bar-count');
 const barTotal = $('#bar-total');
+const barUnlock = $('#bar-unlock');
 const reviewBtn = $('#review-btn');
 const clearBtn = $('#clear-cart');
 const summaryLines = $('#summary-lines');
@@ -343,6 +346,38 @@ function lines() {
   });
 }
 
+function spinUnlocked() {
+  return cartTotal() >= SPIN_MIN_TOTAL;
+}
+
+function spinShortfall() {
+  return Math.max(0, SPIN_MIN_TOTAL - cartTotal());
+}
+
+function updateSpinGate() {
+  const total = cartTotal();
+  const count = countItems();
+  const unlocked = total >= SPIN_MIN_TOTAL;
+  const shortfall = Math.max(0, SPIN_MIN_TOTAL - total);
+
+  if (barUnlock) {
+    barUnlock.hidden = count === 0;
+    barUnlock.textContent =
+      count === 0 ? '' : unlocked ? 'Spin & Win unlocked' : `Add ${money(shortfall)} to unlock Spin & Win`;
+    barUnlock.classList.toggle('is-unlocked', unlocked && count > 0);
+  }
+
+  const stepLabel = $('#step-summary-label');
+  if (stepLabel) stepLabel.textContent = unlocked ? 'Total & Spin' : 'Total';
+
+  const summarySub = $('#summary-sub');
+  if (summarySub) {
+    summarySub.textContent = unlocked
+      ? 'Check the drinks, then spin for a discount or pay as is.'
+      : `Add ${money(shortfall)} more to unlock Spin & Win, or continue to payment.`;
+  }
+}
+
 function conicGradient(segments) {
   const total = segments.reduce((sum, segment) => sum + (Number(segment.weight) || 1), 0);
   let cursor = 0;
@@ -428,7 +463,7 @@ function promoWideTemplate() {
     <article class="promo-tile promo-wide" aria-hidden="true">
       <span class="mini-wheel" style="background:${conicGradient(SEGMENTS)}"></span>
       <div>
-        <span class="eyebrow">Every order gets one spin</span>
+        <span class="eyebrow">Orders ${money(SPIN_MIN_TOTAL)}+ get one spin</span>
         <h3>SPIN &amp; WIN</h3>
         <p>Win up to ${maxWheelPercent()}% off your total. One spin, instantly applied.</p>
       </div>
@@ -495,6 +530,7 @@ function renderBar() {
     ? `${count} drink${count === 1 ? '' : 's'} in this order`
     : 'Tap a drink to start';
   barTotal.textContent = money(total);
+  updateSpinGate();
   reviewBtn.disabled = count === 0;
   clearBtn.hidden = count === 0;
 }
@@ -581,7 +617,7 @@ function lineTemplate(item) {
 function totalCardTemplate() {
   const total = cartTotal();
   const count = countItems();
-  const spin = state.spin;
+  const spin = state.spin && total >= SPIN_MIN_TOTAL ? state.spin : null;
 
   if (spin) {
     return `
@@ -611,6 +647,27 @@ function totalCardTemplate() {
       <p class="total-foot">One spin per order · discount applied instantly</p>`;
   }
 
+  if (total < SPIN_MIN_TOTAL) {
+    return `
+      <span class="total-label">Your total</span>
+      <strong class="total-amount">${money(total)}</strong>
+      <span class="total-sub">${count} drink${count === 1 ? '' : 's'}</span>
+      <div class="total-rule"></div>
+      <div class="spin-nudge spin-nudge-locked">
+        <div class="spin-nudge-top">
+          <span class="nudge-wheel is-locked" style="background:${conicGradient(SEGMENTS)}" aria-hidden="true"></span>
+          <div>
+            <h3>Spin &amp; Win unlocks at ${money(SPIN_MIN_TOTAL)}</h3>
+            <p>Add ${money(SPIN_MIN_TOTAL - total)} more to spin the wheel.</p>
+          </div>
+        </div>
+        <button class="btn spin-btn-main" type="button" data-pay>
+          Continue to payment · ${money(total)} ${icon('arrow')}
+        </button>
+      </div>
+      <p class="total-foot">No spin for orders under ${money(SPIN_MIN_TOTAL)}</p>`;
+  }
+
   return `
     <span class="total-label">Your total</span>
     <strong class="total-amount">${money(total)}</strong>
@@ -638,8 +695,10 @@ function renderSummary() {
     showScreen('menu');
     return;
   }
+  if (state.spin && cartTotal() < SPIN_MIN_TOTAL) clearSpin();
   summaryLines.innerHTML = items.map(lineTemplate).join('');
   totalCard.innerHTML = totalCardTemplate();
+  updateSpinGate();
 }
 
 /* ==================================================================
@@ -711,7 +770,7 @@ function renderPay() {
   }
 
   const total = cartTotal();
-  const spin = state.spin && state.spin.total === total ? state.spin : null;
+  const spin = state.spin && state.spin.total === total && total >= SPIN_MIN_TOTAL ? state.spin : null;
   const final = spin ? spin.final : total;
 
   $('#pay-amount').textContent = money(final);
@@ -776,6 +835,10 @@ function updateWheelTotals() {
 
 function openWheel() {
   if (!countItems()) return;
+  if (!spinUnlocked()) {
+    showToast(`Add ${money(spinShortfall())} more to unlock Spin & Win`);
+    return;
+  }
   ensureWheel();
   updateWheelTotals();
   overlay.classList.add('is-open');
@@ -848,7 +911,7 @@ function showResult(spin, { restore = false } = {}) {
 
 async function doSpin() {
   if (spinning || state.spin) return;
-  if (!countItems()) return;
+  if (!countItems() || !spinUnlocked()) return;
 
   const total = cartTotal();
   const rigged = pickRiggedResult();
