@@ -1017,6 +1017,72 @@ svg {
   gap: 8px;
 }
 
+/* ---------------- menu typography ---------------- */
+
+#screen-menu .menu-head .eyebrow {
+  font-size: 0.75rem;
+}
+
+#screen-menu .menu-head h1 {
+  font-size: clamp(1.7rem, 2.7vw, 2.25rem);
+}
+
+#screen-menu .menu-head p {
+  font-size: 0.86rem;
+}
+
+#screen-menu .menu-head-badge {
+  font-size: 0.8rem;
+}
+
+#screen-menu .category-index {
+  font-size: 0.64rem;
+}
+
+#screen-menu .category-head h2 {
+  font-size: 1.1rem;
+}
+
+#screen-menu .category-tagline {
+  font-size: 0.68rem;
+}
+
+#screen-menu .category-count {
+  font-size: 0.62rem;
+}
+
+#screen-menu .card-count {
+  font-size: 0.84rem;
+}
+
+#screen-menu .card-title-row h3 {
+  font-size: 1.08rem;
+}
+
+#screen-menu .card-price {
+  font-size: 1.08rem;
+}
+
+#screen-menu .card-desc {
+  font-size: 0.68rem;
+}
+
+#screen-menu .tap-hint {
+  font-size: 0.66rem;
+}
+
+#screen-menu .add-pill {
+  font-size: 0.78rem;
+}
+
+#screen-menu .step-qty {
+  font-size: 0.98rem;
+}
+
+#screen-menu .line-total {
+  font-size: 1.06rem;
+}
+
 /* ---------------- order bar ---------------- */
 
 .order-bar {
@@ -1072,7 +1138,7 @@ svg {
 }
 
 .bar-count {
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   font-weight: 800;
   color: var(--ink-muted);
   white-space: nowrap;
@@ -1082,7 +1148,7 @@ svg {
 
 .bar-total {
   font-family: var(--font-display);
-  font-size: 1.8rem;
+  font-size: 1.9rem;
   font-weight: 800;
   line-height: 1.05;
 }
@@ -1095,7 +1161,7 @@ svg {
 }
 
 .bar-unlock {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   font-weight: 900;
   color: var(--pink-deep);
   background: var(--pink-tint);
@@ -1192,7 +1258,7 @@ svg {
 .btn-review {
   min-height: 56px;
   padding: 14px 28px;
-  font-size: 1rem;
+  font-size: 1.06rem;
 }
 
 .btn-back {
