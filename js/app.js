@@ -244,6 +244,8 @@ const reviewBtn = $('#review-btn');
 const clearBtn = $('#clear-cart');
 const summaryLines = $('#summary-lines');
 const totalCard = $('#total-card');
+const summaryUpsell = $('#summary-upsell');
+const upsellRow = $('#upsell-row');
 const overlay = $('#wheel-overlay');
 const wheelIntro = $('#wheel-intro');
 const wheelResult = $('#wheel-result');
@@ -614,6 +616,52 @@ function lineTemplate(item) {
     </article>`;
 }
 
+function upsellCardTemplate(item) {
+  const qty = state.cart.get(item.id) || 0;
+  const controls =
+    qty === 0
+      ? `<button class="upsell-add" type="button" data-add="${item.id}" aria-label="Add ${item.name}">
+          ${icon('plus')} Add
+        </button>`
+      : `<div class="stepper" role="group" aria-label="Quantity for ${item.name}">
+          <button class="step-btn" type="button" data-line-step="-1" data-id="${item.id}" aria-label="Remove one ${item.name}">
+            ${icon('minus')}
+          </button>
+          <span class="step-qty">${qty}</span>
+          <button class="step-btn" type="button" data-line-step="1" data-id="${item.id}" aria-label="Add one ${item.name}">
+            ${icon('plus')}
+          </button>
+        </div>`;
+
+  return `
+    <article class="upsell-card${qty ? ' is-added' : ''}" data-id="${item.id}">
+      <div class="upsell-thumb tint-${item.tint}">
+        <div class="card-art" aria-hidden="true">${drinkArt(item.art)}</div>
+      </div>
+      <div class="upsell-info">
+        <h3>${item.name}</h3>
+        <div class="upsell-foot">
+          <span class="upsell-price">${money(item.price)}</span>
+          ${controls}
+        </div>
+      </div>
+    </article>`;
+}
+
+function renderSummaryUpsell() {
+  if (!summaryUpsell || !upsellRow) return;
+  const total = cartTotal();
+  if (total >= SPIN_MIN_TOTAL) {
+    summaryUpsell.hidden = true;
+    upsellRow.innerHTML = '';
+    return;
+  }
+  summaryUpsell.hidden = false;
+  const title = $('#upsell-title');
+  if (title) title.textContent = `Add ${money(SPIN_MIN_TOTAL - total)} more to unlock the wheel`;
+  upsellRow.innerHTML = MENU.map(upsellCardTemplate).join('');
+}
+
 function totalCardTemplate() {
   const total = cartTotal();
   const count = countItems();
@@ -698,6 +746,7 @@ function renderSummary() {
   if (state.spin && cartTotal() < SPIN_MIN_TOTAL) clearSpin();
   summaryLines.innerHTML = items.map(lineTemplate).join('');
   totalCard.innerHTML = totalCardTemplate();
+  renderSummaryUpsell();
   updateSpinGate();
 }
 
@@ -1482,6 +1531,21 @@ summaryLines.addEventListener('click', (event) => {
     if (countItems()) renderSummary();
     else showScreen('menu');
   }
+});
+
+upsellRow.addEventListener('click', (event) => {
+  const step = event.target.closest('[data-line-step]');
+  if (step) {
+    changeQty(step.dataset.id, Number(step.dataset.lineStep));
+    return;
+  }
+  const add = event.target.closest('[data-add]');
+  if (add) {
+    addItem(add.dataset.add);
+    return;
+  }
+  const card = event.target.closest('.upsell-card');
+  if (card && !event.target.closest('button')) addItem(card.dataset.id);
 });
 
 totalCard.addEventListener('click', (event) => {
