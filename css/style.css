@@ -2852,6 +2852,30 @@ svg {
   margin-top: 16px;
 }
 
+.admin-footer {
+  position: sticky;
+  bottom: -26px;
+  z-index: 6;
+  margin: 18px -26px -26px;
+  padding: 10px 26px 16px;
+  background: var(--paper);
+  border-top: 1px solid rgba(90, 45, 60, 0.12);
+  box-shadow: 0 -12px 24px -18px rgba(90, 40, 60, 0.45);
+}
+
+.admin-footer .admin-error {
+  margin: 0 0 4px;
+}
+
+.admin-footer .admin-actions {
+  margin-top: 0;
+}
+
+.admin-save-note {
+  margin-top: 6px;
+  text-align: center;
+}
+
 .admin-actions {
   display: flex;
   justify-content: space-between;
@@ -2944,6 +2968,12 @@ svg {
   .admin-color {
     width: 38px;
     height: 36px;
+  }
+
+  .admin-footer {
+    bottom: -18px;
+    margin: 16px -18px -18px;
+    padding: 10px 18px 14px;
   }
 
   .admin-lock-form {

@@ -991,10 +991,13 @@ function readAdminOffers() {
   const weights = new Map(adminOffers.map((offer) => [offer.id, offer.weight]));
   return $$('.admin-offer-row', adminOfferRows).map((row) => {
     const id = row.dataset.offerId;
+    const percent = Number(row.querySelector('[data-offer="percent"]').value);
+    const label = row.querySelector('[data-offer="label"]').value.trim();
+    const standardLabel = /^\d+(?:\.\d+)?%\s*OFF$/i.test(label);
     return {
       id,
-      label: row.querySelector('[data-offer="label"]').value.trim(),
-      percent: Number(row.querySelector('[data-offer="percent"]').value),
+      label: standardLabel && Number.isFinite(percent) ? `${percent}% OFF` : label,
+      percent,
       color: row.querySelector('[data-offer="color"]').value,
       weight: weights.get(id) || 10,
     };
@@ -1430,6 +1433,30 @@ $('#admin-qr-remove').addEventListener('click', () => {
 $('#admin-add-offer').addEventListener('click', addAdminOffer);
 $('#admin-add-sequence').addEventListener('click', addAdminSequenceStep);
 
+adminOfferRows.addEventListener('input', (event) => {
+  const row = event.target.closest('.admin-offer-row');
+  if (!row) return;
+  const label = row.querySelector('[data-offer="label"]');
+  const percent = row.querySelector('[data-offer="percent"]');
+
+  if (event.target === percent) {
+    const value = percent.value.trim();
+    if (!value || !Number.isFinite(Number(value))) return;
+    if (/^(\d+(?:\.\d+)?)?%\s*OFF$/i.test(label.value.trim())) label.value = `${value}% OFF`;
+    return;
+  }
+  if (event.target === label) {
+    const match = label.value.trim().match(/^(\d+(?:\.\d+)?)%\s*OFF$/i);
+    if (match) percent.value = String(Number(match[1]));
+  }
+});
+
+adminOfferRows.addEventListener('change', () => {
+  adminOffers = readAdminOffers();
+  adminSequence = readAdminSequence();
+  renderAdminSequence();
+});
+
 adminOfferRows.addEventListener('click', (event) => {
   const remove = event.target.closest('[data-remove-offer]');
   if (!remove) return;
@@ -1524,6 +1551,17 @@ document.addEventListener('contextmenu', (event) => event.preventDefault());
 
 document.querySelectorAll('[data-home]').forEach((link) => {
   link.addEventListener('click', (event) => event.preventDefault());
+});
+
+// If settings are saved in another tab, pick them up here and drop any
+// order that was priced with the old offers so the payment cannot be stale.
+window.addEventListener('storage', (event) => {
+  if (event.key !== SETTINGS_KEY || !event.newValue) return;
+  SETTINGS = loadSettings();
+  applySettings();
+  renderMenu();
+  resetOrder();
+  showToast('Settings updated');
 });
 
 /* ==================================================================
