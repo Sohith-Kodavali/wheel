@@ -140,13 +140,18 @@ function loadSettings() {
     if (raw.version === DEFAULT_SETTINGS.version && raw.wheel && Array.isArray(raw.wheel.segments)) {
       const segments = raw.wheel.segments
         .filter((segment) => segment && typeof segment.id === 'string' && typeof segment.label === 'string')
-        .map((segment) => ({
-          id: segment.id.slice(0, 40),
-          label: segment.label.trim().slice(0, 24),
-          percent: Number(segment.percent),
-          weight: Number(segment.weight) > 0 ? Number(segment.weight) : 10,
-          color: /^#[0-9a-fA-F]{6}$/.test(segment.color) ? segment.color : '#FF7FB0',
-        }))
+        .map((segment) => {
+          const percent = Number(segment.percent);
+          const label = segment.label.trim().slice(0, 24);
+          const standardLabel = /^(\d+(?:\.\d+)?)?%\s*OFF$/i.test(label);
+          return {
+            id: segment.id.slice(0, 40),
+            label: standardLabel && Number.isFinite(percent) ? `${percent}% OFF` : label,
+            percent,
+            weight: Number(segment.weight) > 0 ? Number(segment.weight) : 10,
+            color: /^#[0-9a-fA-F]{6}$/.test(segment.color) ? segment.color : '#FF7FB0',
+          };
+        })
         .filter(
           (segment) =>
             segment.id && segment.label && Number.isFinite(segment.percent) && segment.percent >= 0 && segment.percent <= 100,
@@ -193,7 +198,10 @@ function applySettings() {
     const override = SETTINGS.menu[item.id];
     return override ? { ...item, price: override.price } : { ...item };
   });
-  SEGMENTS = SETTINGS.wheel.segments.map((segment) => ({ ...segment }));
+  SEGMENTS = SETTINGS.wheel.segments.map((segment) => ({
+    ...segment,
+    label: /^(\d+(?:\.\d+)?)?%\s*OFF$/i.test(segment.label) ? `${segment.percent}% OFF` : segment.label,
+  }));
   RIGGED_SEQUENCE = SETTINGS.spin.sequence.slice();
   LIMITS = {
     maxDiscount: SETTINGS.spin.maxDiscount,
@@ -953,7 +961,7 @@ function populateAdminForm() {
   $('#admin-min').value = SETTINGS.spin.minPayable / 100;
   $('#admin-new-pin').value = '';
   adminImage = SETTINGS.qr.image || '';
-  adminOffers = SETTINGS.wheel.segments.map((offer) => ({ ...offer }));
+  adminOffers = SEGMENTS.map((offer) => ({ ...offer }));
   adminSequence = SETTINGS.spin.sequence.slice();
   renderAdminMenuRows();
   renderAdminOffers();
