@@ -1,15 +1,5 @@
 export const DEFAULT_MENU = [
   {
-    id: 'oreo',
-    name: 'Oreo Milkshake',
-    flavour: 'Oreo',
-    category: 'Milkshake',
-    price: 7500,
-    tint: 'pink',
-    art: 'shake-oreo',
-    desc: 'Cookies and cream, blended thick.',
-  },
-  {
     id: 'kitkat',
     name: 'KitKat Milkshake',
     flavour: 'KitKat',
@@ -20,6 +10,16 @@ export const DEFAULT_MENU = [
     desc: 'Chocolate overload with crunch.',
   },
   {
+    id: 'oreo',
+    name: 'Oreo Milkshake',
+    flavour: 'Oreo',
+    category: 'Milkshake',
+    price: 7500,
+    tint: 'pink',
+    art: 'shake-oreo',
+    desc: 'Cookies and cream, blended thick.',
+  },
+  {
     id: 'dark',
     name: 'Dark Fantasy Milkshake',
     flavour: 'Dark Fantasy',
@@ -28,6 +28,16 @@ export const DEFAULT_MENU = [
     tint: 'pink',
     art: 'shake-dark',
     desc: 'Dark chocolate, extra decadent.',
+  },
+  {
+    id: 'blue',
+    name: 'Blue Mojito',
+    flavour: 'Blue',
+    category: 'Mojito',
+    price: 3900,
+    tint: 'mint',
+    art: 'mojito-blue',
+    desc: 'Icy blue fizz, extra refreshing.',
   },
   {
     id: 'cuban',
@@ -48,16 +58,6 @@ export const DEFAULT_MENU = [
     tint: 'mint',
     art: 'mojito-lime',
     desc: 'Sweet citrus fizz over ice.',
-  },
-  {
-    id: 'blue',
-    name: 'Blue Mojito',
-    flavour: 'Blue',
-    category: 'Mojito',
-    price: 3900,
-    tint: 'mint',
-    art: 'mojito-blue',
-    desc: 'Icy blue fizz, extra refreshing.',
   },
   {
     id: 'coffee',
@@ -82,7 +82,7 @@ export const DEFAULT_WHEEL = [
   { id: 'off-5', label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
 ];
 
-export const SPIN_MIN_ITEMS = 3;
+export const SPIN_MIN_ITEMS = 2;
 export const SETTINGS_KEY = 'msf-tablet-settings-v1';
 export const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
 

@@ -313,7 +313,7 @@ export class PrizeWheel {
     this.applyRotation();
   }
 
-  spinToIndex(index, { duration } = {}) {
+  spinToIndex(index, { duration, turns: requestedTurns } = {}) {
     if (this.animating) return Promise.resolve();
     this.animating = true;
     this.sound.ensure();
@@ -329,10 +329,10 @@ export class PrizeWheel {
     const targetMod = (((270 - center - jitter) % 360) + 360) % 360;
     const currentMod = (((this.rotation % 360) + 360) % 360);
     const delta = (targetMod - currentMod + 360) % 360;
-    const turns = this.reducedMotion ? 1 : 6 + Math.floor(Math.random() * 2);
+    const turns = this.reducedMotion ? 1 : requestedTurns || 6 + Math.floor(Math.random() * 2);
     const travel = turns * 360 + delta;
     const start = this.rotation;
-    const totalDuration = duration || (this.reducedMotion ? 1400 : 5600 + Math.random() * 500);
+    const totalDuration = this.reducedMotion ? 1400 : duration || 5600 + Math.random() * 500;
     const startTime = performance.now();
 
     return new Promise((resolve) => {

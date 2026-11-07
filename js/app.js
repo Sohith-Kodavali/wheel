@@ -895,7 +895,16 @@ async function doSpin() {
   if (navigator.vibrate) navigator.vibrate([24, 40, 24]);
 
   try {
-    await wheel.spinToIndex(rigged.index);
+    const longSpin = rigged.percent > 5;
+    await wheel.spinToIndex(
+      rigged.index,
+      longSpin
+        ? {
+            duration: 7800 + rigged.percent * 60 + Math.random() * 600,
+            turns: 9 + Math.floor(Math.random() * 2),
+          }
+        : undefined,
+    );
     const { discount, final } = discountFor(total, rigged.percent);
     state.spin = {
       percent: rigged.percent,

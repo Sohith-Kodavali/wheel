@@ -696,8 +696,28 @@ a.icon-btn {
 }
 
 .drink-card.is-special {
-  border-color: #f3c25b;
-  box-shadow: 0 26px 46px -32px rgba(190, 120, 0, 0.55);
+  border-color: #f5b93b;
+  box-shadow:
+    0 0 0 2px rgba(255, 196, 70, 0.55),
+    0 0 26px rgba(255, 176, 30, 0.45),
+    0 26px 50px -30px rgba(190, 120, 0, 0.7);
+  animation: special-glow 2.6s ease-in-out infinite;
+}
+
+@keyframes special-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 196, 70, 0.5),
+      0 0 20px rgba(255, 176, 30, 0.35),
+      0 24px 46px -30px rgba(190, 120, 0, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 210, 100, 0.9),
+      0 0 38px rgba(255, 176, 30, 0.75),
+      0 24px 46px -30px rgba(190, 120, 0, 0.6);
+  }
 }
 
 .drink-card.is-out {
@@ -722,7 +742,7 @@ a.icon-btn {
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  box-shadow: 0 8px 16px -8px rgba(150, 85, 0, 0.8);
+  box-shadow: 0 8px 16px -8px rgba(150, 85, 0, 0.8), 0 0 16px rgba(255, 192, 60, 0.7);
 }
 
 .card-out {
