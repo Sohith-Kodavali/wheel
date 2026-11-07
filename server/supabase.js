@@ -1,5 +1,6 @@
 const ORDERS = 'orders';
 const ITEMS = 'order_items';
+const SETTINGS = 'app_settings';
 
 const baseUrl = (process.env.SUPABASE_URL || '')
   .trim()
@@ -248,4 +249,29 @@ export async function analytics() {
 export async function health() {
   await rest(`${ORDERS}?select=id&limit=1`);
   return true;
+}
+
+export async function getSettings() {
+  const { data } = await rest(`${SETTINGS}?id=eq.1&select=data`);
+  return data?.[0]?.data || {};
+}
+
+export async function getPinRecord() {
+  const { data } = await rest(`${SETTINGS}?id=eq.1&select=pin_hash,pin_salt`);
+  const row = data?.[0];
+  if (!row?.pin_hash || !row?.pin_salt) return null;
+  return { hash: row.pin_hash, salt: row.pin_salt };
+}
+
+export async function saveSettings(settings, pin) {
+  const body = { id: 1, data: settings, updated_at: new Date().toISOString() };
+  if (pin) {
+    body.pin_hash = pin.hash;
+    body.pin_salt = pin.salt;
+  }
+  await rest(`${SETTINGS}?on_conflict=id`, {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates,return=minimal',
+    body,
+  });
 }

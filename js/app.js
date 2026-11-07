@@ -1,197 +1,38 @@
 import { drinkArt, logoMark } from './art.js';
+import {
+  DEFAULT_MENU,
+  DEFAULT_SETTINGS,
+  SETTINGS_KEY,
+  SPIN_MIN_TOTAL,
+  escapeHtml,
+  normalizeSettings,
+} from './config.js';
 import { PrizeWheel, WheelSound, blast, celebrate } from './wheel.js';
 
 /* ==================================================================
-   DEFAULT CONFIG — staff can change the live values from the gear menu
+   SHARED SETTINGS — fetched from the server and cached for offline use
    ================================================================== */
 
-const DEFAULT_MENU = [
-  {
-    id: 'oreo',
-    name: 'Oreo Milkshake',
-    flavour: 'Oreo',
-    category: 'Milkshake',
-    price: 7500,
-    tint: 'pink',
-    art: 'shake-oreo',
-    desc: 'Cookies and cream, blended thick.',
-  },
-  {
-    id: 'kitkat',
-    name: 'KitKat Milkshake',
-    flavour: 'KitKat',
-    category: 'Milkshake',
-    price: 7500,
-    tint: 'pink',
-    art: 'shake-kitkat',
-    desc: 'Chocolate overload with crunch.',
-  },
-  {
-    id: 'dark',
-    name: 'Dark Fantasy Milkshake',
-    flavour: 'Dark Fantasy',
-    category: 'Milkshake',
-    price: 7500,
-    tint: 'pink',
-    art: 'shake-dark',
-    desc: 'Dark chocolate, extra decadent.',
-  },
-  {
-    id: 'cuban',
-    name: 'Cuban Mint Mojito',
-    flavour: 'Cuban Mint',
-    category: 'Mojito',
-    price: 3900,
-    tint: 'mint',
-    art: 'mojito-mint',
-    desc: 'Mint, lime and crushed ice.',
-  },
-  {
-    id: 'lime',
-    name: 'Lime Mojito',
-    flavour: 'Lime',
-    category: 'Mojito',
-    price: 3900,
-    tint: 'mint',
-    art: 'mojito-lime',
-    desc: 'Sharp citrus fizz over ice.',
-  },
-  {
-    id: 'blue',
-    name: 'Blue Mojito',
-    flavour: 'Blue',
-    category: 'Mojito',
-    price: 3900,
-    tint: 'mint',
-    art: 'mojito-blue',
-    desc: 'Icy blue fizz, extra refreshing.',
-  },
-  {
-    id: 'coffee',
-    name: 'Cold Coffee',
-    flavour: 'Classic',
-    category: 'Cold Coffee',
-    price: 6500,
-    tint: 'caramel',
-    art: 'coffee',
-    desc: 'Bold coffee, shaken ice cold.',
-  },
-];
-
-const OFFER_COLORS = ['#FF7FB0', '#FFC24B', '#6FE0C2', '#9BD9FF', '#D3A8FF', '#FF9A6C', '#FF6B8B', '#8FD3FF'];
-
-// The wheel's default offers. `weight` controls the physical slice size.
-const DEFAULT_WHEEL = [
-  { id: 'off-1', label: '10% OFF', percent: 10, weight: 34, color: '#FF7FB0' },
-  { id: 'off-2', label: '15% OFF', percent: 15, weight: 24, color: '#FFC24B' },
-  { id: 'off-3', label: '10% OFF', percent: 10, weight: 18, color: '#6FE0C2' },
-  { id: 'off-4', label: '20% OFF', percent: 20, weight: 14, color: '#9BD9FF' },
-  { id: 'off-5', label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
-];
-
-const SPIN_MIN_TOTAL = 10000;
-
-/* ==================================================================
-   LOCAL SETTINGS — persisted in this tablet's localStorage
-   ================================================================== */
-
-const SETTINGS_KEY = 'msf-tablet-settings-v1';
-const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
-
-const DEFAULT_SETTINGS = {
-  version: 3,
-  upi: { id: 'milkshakefactory@upi', name: 'The Milkshake Factory' },
-  qr: { mode: 'dynamic', image: '' },
-  menu: {},
-  wheel: { segments: DEFAULT_WHEEL },
-  spin: {
-    sequence: ['off-1', 'off-3', 'off-2', 'off-1', 'off-4', 'off-3', 'off-5', 'off-1', 'off-2', 'off-1'],
-    maxDiscount: 6000,
-    minPayable: 3000,
-  },
-  adminPin: '1234',
-};
-
-let SETTINGS = loadSettings();
+let SETTINGS = normalizeSettings(readSettingsCache());
 let MENU = [];
-let SEGMENTS = DEFAULT_WHEEL.map((segment) => ({ ...segment }));
+let SEGMENTS = DEFAULT_SETTINGS.wheel.segments.map((segment) => ({ ...segment }));
 let RIGGED_SEQUENCE = [];
 let LIMITS = { maxDiscount: 6000, minPayable: 3000 };
-let adminImage = '';
-let adminUnlocked = false;
-let adminOffers = [];
-let adminSequence = [];
+let settingsSignature = JSON.stringify(SETTINGS);
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+function readSettingsCache() {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+  } catch {
+    return null;
+  }
 }
 
-function loadSettings() {
-  const base = clone(DEFAULT_SETTINGS);
+function cacheSettings(settings) {
   try {
-    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
-    if (!raw || typeof raw !== 'object') return base;
-
-    if (typeof raw.upi?.id === 'string' && UPI_PATTERN.test(raw.upi.id.trim())) base.upi.id = raw.upi.id.trim();
-    if (typeof raw.upi?.name === 'string' && raw.upi.name.trim()) {
-      base.upi.name = raw.upi.name.trim().slice(0, 60);
-    }
-    if (raw.qr && ['dynamic', 'uploaded'].includes(raw.qr.mode)) base.qr.mode = raw.qr.mode;
-    if (typeof raw.qr?.image === 'string' && raw.qr.image.startsWith('data:image/')) base.qr.image = raw.qr.image;
-
-    if (raw.version === DEFAULT_SETTINGS.version && raw.wheel && Array.isArray(raw.wheel.segments)) {
-      const segments = raw.wheel.segments
-        .filter((segment) => segment && typeof segment.id === 'string' && typeof segment.label === 'string')
-        .map((segment) => {
-          const percent = Number(segment.percent);
-          const label = segment.label.trim().slice(0, 24);
-          const standardLabel = /^(\d+(?:\.\d+)?)?%\s*OFF$/i.test(label);
-          return {
-            id: segment.id.slice(0, 40),
-            label: standardLabel && Number.isFinite(percent) ? `${percent}% OFF` : label,
-            percent,
-            weight: Number(segment.weight) > 0 ? Number(segment.weight) : 10,
-            color: /^#[0-9a-fA-F]{6}$/.test(segment.color) ? segment.color : '#FF7FB0',
-          };
-        })
-        .filter(
-          (segment) =>
-            segment.id && segment.label && Number.isFinite(segment.percent) && segment.percent >= 0 && segment.percent <= 100,
-        );
-      if (segments.length >= 2) base.wheel.segments = segments;
-    }
-
-    if (raw.version === DEFAULT_SETTINGS.version && raw.spin && Array.isArray(raw.spin.sequence)) {
-      const offerIds = new Set(base.wheel.segments.map((segment) => segment.id));
-      const sequence = raw.spin.sequence.map(String).filter((id) => offerIds.has(id));
-      if (sequence.length) base.spin.sequence = sequence.slice(0, 60);
-    }
-    if (Number.isFinite(Number(raw.spin?.maxDiscount)) && Number(raw.spin.maxDiscount) >= 0) {
-      base.spin.maxDiscount = Math.round(Number(raw.spin.maxDiscount));
-    }
-    if (Number.isFinite(Number(raw.spin?.minPayable)) && Number(raw.spin.minPayable) >= 0) {
-      base.spin.minPayable = Math.round(Number(raw.spin.minPayable));
-    }
-    if (typeof raw.adminPin === 'string' && /^\d{4,8}$/.test(raw.adminPin)) base.adminPin = raw.adminPin;
-
-    // Older saved settings used the removed dual (normal/spin) prices, so
-    // stale overrides are ignored and the new single-price defaults apply.
-    if (raw.version === DEFAULT_SETTINGS.version && raw.menu && typeof raw.menu === 'object') {
-      for (const item of DEFAULT_MENU) {
-        const override = raw.menu[item.id];
-        if (
-          override &&
-          Number.isInteger(override.price) &&
-          override.price > 0 &&
-          override.price <= 1_000_000
-        ) {
-          base.menu[item.id] = { price: override.price };
-        }
-      }
-    }
-    return base;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   } catch {
-    return base;
+    // A large QR photo can exceed localStorage; the server still has it.
   }
 }
 
@@ -217,8 +58,37 @@ function applySettings() {
   state.sequenceIndex = 0;
 }
 
-function persistSettings(next) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+async function pullSettings() {
+  try {
+    const response = await fetch('/api/settings', { cache: 'no-store' });
+    if (!response.ok) return false;
+    const data = await response.json();
+    const next = normalizeSettings(data?.settings);
+    const signature = JSON.stringify(next);
+    if (signature === settingsSignature) return false;
+
+    settingsSignature = signature;
+    SETTINGS = next;
+    cacheSettings(next);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function syncSettings({ initial = false } = {}) {
+  if (spinning) return;
+
+  const changed = await pullSettings();
+  if (!changed || initial) return;
+
+  if (state.spin) clearSpin();
+  if (overlay.classList.contains('is-open')) closeWheel();
+
+  applySettings();
+  renderMenu();
+  if (state.screen === 'summary') renderSummary();
+  if (state.screen === 'pay') renderPay();
 }
 
 /* ==================================================================
@@ -256,18 +126,6 @@ const muteBtn = $('#mute-btn');
 const flash = $('#flash');
 const qrCode = $('#qr-code');
 const newOrderBtn = $('#new-order');
-const adminOverlay = $('#admin-overlay');
-const adminLock = $('#admin-lock');
-const adminContent = $('#admin-content');
-const adminForm = $('#admin-form');
-const pinForm = $('#pin-form');
-const pinInput = $('#pin-input');
-const pinError = $('#pin-error');
-const adminError = $('#admin-error');
-const adminQrPreview = $('#admin-qr-preview');
-const adminMenuRows = $('#admin-menu-rows');
-const adminOfferRows = $('#admin-offer-rows');
-const adminSequenceRows = $('#admin-sequence-rows');
 const toast = $('#toast');
 
 let wheel = null;
@@ -284,13 +142,6 @@ const uiSound = new WheelSound(muted);
 
 function icon(name) {
   return `<svg class="ico" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(
-    /[&<>"']/g,
-    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
-  );
 }
 
 function money(paise) {
@@ -311,11 +162,6 @@ function playSuccess() {
   [523.25, 659.25, 783.99, 1046.5].forEach((freq, index) => {
     uiSound.blip(freq, 0.22, 'triangle', 0.2, index * 0.08);
   });
-}
-
-function playError() {
-  uiSound.blip(190, 0.16, 'sawtooth', 0.16);
-  uiSound.blip(140, 0.2, 'sawtooth', 0.14, 0.12);
 }
 
 function playWhoosh() {
@@ -1067,7 +913,7 @@ function closeBtnDisable(disabled) {
 }
 
 /* ==================================================================
-   LOCAL ADMIN
+   FEEDBACK
    ================================================================== */
 
 function showToast(message) {
@@ -1076,401 +922,6 @@ function showToast(message) {
   toast.classList.add('is-on');
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => toast.classList.remove('is-on'), 2600);
-}
-
-function openAdmin() {
-  adminImage = SETTINGS.qr.image || '';
-  adminOverlay.classList.add('is-open');
-  adminOverlay.setAttribute('aria-hidden', 'false');
-  if (adminUnlocked) showAdminForm();
-  else showAdminLock();
-}
-
-function closeAdmin() {
-  adminUnlocked = false;
-  adminOverlay.classList.remove('is-open');
-  adminOverlay.setAttribute('aria-hidden', 'true');
-  adminError.textContent = '';
-}
-
-function showAdminLock() {
-  adminLock.hidden = false;
-  adminContent.hidden = true;
-  pinError.textContent = '';
-  pinInput.value = '';
-  setTimeout(() => pinInput.focus(), 90);
-}
-
-function showAdminForm() {
-  adminLock.hidden = true;
-  adminContent.hidden = false;
-  populateAdminForm();
-}
-
-function populateAdminForm() {
-  adminError.textContent = '';
-  $('#admin-upi-id').value = SETTINGS.upi.id;
-  $('#admin-upi-name').value = SETTINGS.upi.name;
-  $('#admin-qr-mode').value = SETTINGS.qr.mode;
-  $('#admin-max').value = SETTINGS.spin.maxDiscount / 100;
-  $('#admin-min').value = SETTINGS.spin.minPayable / 100;
-  $('#admin-new-pin').value = '';
-  adminImage = SETTINGS.qr.image || '';
-  adminOffers = SEGMENTS.map((offer) => ({ ...offer }));
-  adminSequence = SETTINGS.spin.sequence.slice();
-  renderAdminMenuRows();
-  renderAdminOffers();
-  renderAdminSequence();
-  renderAdminQrPreview();
-}
-
-function renderAdminMenuRows() {
-  adminMenuRows.innerHTML = MENU.map(
-    (item) => `
-    <div class="admin-menu-row" data-menu-id="${item.id}">
-      <span class="admin-drink">${escapeHtml(item.name)}<small>${escapeHtml(item.flavour)}</small></span>
-      <input
-        class="admin-input"
-        type="number"
-        min="1"
-        step="1"
-        data-price="price"
-        value="${item.price / 100}"
-        aria-label="${escapeHtml(item.name)} price"
-      />
-    </div>`,
-  ).join('');
-}
-
-function newOfferId() {
-  let id;
-  do {
-    id = `off-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  } while (adminOffers.some((offer) => offer.id === id));
-  return id;
-}
-
-function readAdminOffers() {
-  return $$('.admin-offer-row', adminOfferRows).map((row) => {
-    const id = row.dataset.offerId;
-    const percent = Number(row.querySelector('[data-offer="percent"]').value);
-    const label = row.querySelector('[data-offer="label"]').value.trim();
-    const standardLabel = /^\d+(?:\.\d+)?%\s*OFF$/i.test(label);
-    const weight = Number(row.querySelector('[data-offer="weight"]').value);
-    return {
-      id,
-      label: standardLabel && Number.isFinite(percent) ? `${percent}% OFF` : label,
-      percent,
-      color: row.querySelector('[data-offer="color"]').value,
-      weight: Number.isFinite(weight) ? weight : 0,
-    };
-  });
-}
-
-function readAdminSequence() {
-  return $$('[data-sequence-select]', adminSequenceRows).map((select) => select.value);
-}
-
-function updateWheelTotal() {
-  const total = $$('[data-offer="weight"]', adminOfferRows).reduce(
-    (sum, input) => sum + (Number(input.value) || 0),
-    0,
-  );
-  const element = $('#admin-wheel-total');
-  if (!element) return;
-  const rounded = Math.round(total * 10) / 10;
-  const scaled = Math.abs(rounded - 100) > 0.5;
-  element.textContent = scaled ? `Wheel total: ${rounded}% · scaled to fit` : 'Wheel total: 100%';
-  element.classList.toggle('is-off', scaled);
-}
-
-function renderAdminOffers() {
-  adminOfferRows.innerHTML = adminOffers
-    .map(
-      (offer) => `
-    <div class="admin-offer-row" data-offer-id="${escapeHtml(offer.id)}">
-      <input
-        class="admin-input"
-        type="text"
-        data-offer="label"
-        maxlength="24"
-        value="${escapeHtml(offer.label)}"
-        aria-label="Offer label"
-      />
-      <div class="admin-percent">
-        <input
-          class="admin-input"
-          type="number"
-          data-offer="percent"
-          min="0"
-          max="100"
-          step="1"
-          value="${offer.percent}"
-          aria-label="Discount percent"
-        />
-        <span>%</span>
-      </div>
-      <input
-        class="admin-input"
-        type="number"
-        data-offer="weight"
-        min="1"
-        step="1"
-        value="${offer.weight}"
-        aria-label="Wheel percentage"
-      />
-      <input class="admin-color" type="color" data-offer="color" value="${escapeHtml(offer.color)}" aria-label="Offer colour" />
-      <button class="remove-line" type="button" data-remove-offer="${escapeHtml(offer.id)}" aria-label="Remove offer">
-        ${icon('trash')}
-      </button>
-    </div>`,
-    )
-    .join('');
-  updateWheelTotal();
-}
-
-function renderAdminSequence() {
-  if (!adminOffers.length) {
-    adminSequenceRows.innerHTML = '<p class="admin-hint">Add an offer first.</p>';
-    return;
-  }
-  const ids = new Set(adminOffers.map((offer) => offer.id));
-  adminSequence = adminSequence.filter((id) => ids.has(id));
-  if (!adminSequence.length) adminSequence = [adminOffers[0].id];
-
-  adminSequenceRows.innerHTML = adminSequence
-    .map(
-      (id, index) => `
-    <div class="admin-sequence-row">
-      <span class="admin-seq-index">${index + 1}</span>
-      <select class="admin-input" data-sequence-select aria-label="Offer for spin ${index + 1}">
-        ${adminOffers
-          .map(
-            (offer) =>
-              `<option value="${escapeHtml(offer.id)}"${offer.id === id ? ' selected' : ''}>${escapeHtml(offer.label)} · ${offer.percent}%</option>`,
-          )
-          .join('')}
-      </select>
-      <button class="remove-line" type="button" data-remove-sequence="${index}" aria-label="Remove spin ${index + 1}">
-        ${icon('trash')}
-      </button>
-    </div>`,
-    )
-    .join('');
-}
-
-function addAdminOffer() {
-  adminOffers = readAdminOffers();
-  adminSequence = readAdminSequence();
-  adminOffers.push({
-    id: newOfferId(),
-    label: '10% OFF',
-    percent: 10,
-    color: OFFER_COLORS[adminOffers.length % OFFER_COLORS.length],
-    weight: 10,
-  });
-  renderAdminOffers();
-  renderAdminSequence();
-}
-
-function addAdminSequenceStep() {
-  adminOffers = readAdminOffers();
-  adminSequence = readAdminSequence();
-  if (!adminOffers.length) return;
-  adminSequence.push(adminOffers[0].id);
-  renderAdminSequence();
-}
-
-function renderAdminQrPreview() {
-  adminQrPreview.innerHTML = adminImage
-    ? `<img src="${escapeHtml(adminImage)}" alt="UPI QR preview">`
-    : '<span>No QR photo</span>';
-}
-
-async function resizeImage(file, max = 640) {
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(reader.error || new Error('Could not read the file'));
-    reader.readAsDataURL(file);
-  });
-
-  const image = await new Promise((resolve, reject) => {
-    const element = new Image();
-    element.onload = () => resolve(element);
-    element.onerror = () => reject(new Error('Could not decode the image'));
-    element.src = dataUrl;
-  });
-
-  const scale = Math.min(1, max / Math.max(image.width, image.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(image.width * scale));
-  canvas.height = Math.max(1, Math.round(image.height * scale));
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/png');
-}
-
-async function handleQrUpload(file) {
-  if (!file) return;
-  if (file.size > 12 * 1024 * 1024) {
-    adminError.textContent = 'That image is too large. Use one under 12 MB.';
-    return;
-  }
-  try {
-    adminImage = await resizeImage(file);
-    $('#admin-qr-mode').value = 'uploaded';
-    renderAdminQrPreview();
-    adminError.textContent = '';
-  } catch (error) {
-    console.error('QR upload failed', error);
-    adminError.textContent = 'Could not read that image. Try a PNG or JPG.';
-  }
-}
-
-function submitPin(event) {
-  event.preventDefault();
-  if (pinInput.value === SETTINGS.adminPin) {
-    adminUnlocked = true;
-    pinError.textContent = '';
-    playSuccess();
-    showAdminForm();
-  } else {
-    pinError.textContent = 'Wrong PIN. Try again.';
-    pinInput.value = '';
-    pinInput.focus();
-    playError();
-  }
-}
-
-function saveAdminSettings(event) {
-  event.preventDefault();
-  adminError.textContent = '';
-
-  const upiId = $('#admin-upi-id').value.trim();
-  const upiName = $('#admin-upi-name').value.trim();
-  const qrMode = $('#admin-qr-mode').value;
-  const offers = readAdminOffers();
-  const sequence = readAdminSequence();
-  const maxDiscount = Math.round(Number($('#admin-max').value) * 100);
-  const minPayable = Math.round(Number($('#admin-min').value) * 100);
-  const newPin = $('#admin-new-pin').value.trim();
-
-  if (!UPI_PATTERN.test(upiId)) {
-    adminError.textContent = 'Enter a valid UPI ID, for example stall@bank.';
-    return;
-  }
-  if (upiName.length < 2 || upiName.length > 60) {
-    adminError.textContent = 'UPI display name must be 2–60 characters.';
-    return;
-  }
-  if (qrMode === 'uploaded' && !adminImage) {
-    adminError.textContent = 'Upload a QR photo, or choose the generated QR.';
-    return;
-  }
-  if (offers.length < 2) {
-    adminError.textContent = 'Add at least two wheel offers.';
-    return;
-  }
-  if (offers.length > 16) {
-    adminError.textContent = 'Keep the wheel to 16 offers or fewer.';
-    return;
-  }
-  for (const offer of offers) {
-    if (!offer.label || offer.label.length > 24) {
-      adminError.textContent = 'Each offer needs a label of 1–24 characters.';
-      return;
-    }
-    if (!Number.isFinite(offer.percent) || offer.percent < 0 || offer.percent > 100) {
-      adminError.textContent = `"${offer.label}": enter a discount between 0 and 100.`;
-      return;
-    }
-    if (!Number.isFinite(offer.weight) || offer.weight <= 0) {
-      adminError.textContent = `"${offer.label}": set a wheel size above 0.`;
-      return;
-    }
-  }
-  const totalWeight = offers.reduce((sum, offer) => sum + offer.weight, 0);
-  const normalizedOffers = offers.map((offer) => ({
-    ...offer,
-    weight: Math.max(0.1, Math.round((offer.weight / totalWeight) * 1000) / 10),
-  }));
-  const offerIds = new Set(offers.map((offer) => offer.id));
-  const steps = sequence.filter((id) => offerIds.has(id));
-  if (!steps.length || steps.length > 60) {
-    adminError.textContent = `Add between 1 and 60 steps to the spin sequence.`;
-    return;
-  }
-  if (!Number.isFinite(maxDiscount) || maxDiscount < 0 || maxDiscount > 1_000_000) {
-    adminError.textContent = 'Enter a valid maximum discount.';
-    return;
-  }
-  if (!Number.isFinite(minPayable) || minPayable < 0 || minPayable > 1_000_000) {
-    adminError.textContent = 'Enter a valid minimum payable amount.';
-    return;
-  }
-  if (newPin && !/^\d{4,8}$/.test(newPin)) {
-    adminError.textContent = 'The admin PIN must be 4–8 digits.';
-    return;
-  }
-
-  const menu = {};
-  for (const row of adminMenuRows.querySelectorAll('.admin-menu-row')) {
-    const id = row.dataset.menuId;
-    const item = DEFAULT_MENU.find((entry) => entry.id === id);
-    if (!item) continue;
-    const price = Math.round(Number(row.querySelector('[data-price="price"]').value) * 100);
-
-    if (!Number.isFinite(price) || price <= 0 || price > 1_000_000) {
-      adminError.textContent = `${item.name}: enter a valid price.`;
-      return;
-    }
-    menu[id] = { price };
-  }
-
-  const next = {
-    version: DEFAULT_SETTINGS.version,
-    upi: { id: upiId, name: upiName },
-    qr: { mode: qrMode, image: adminImage },
-    menu,
-    wheel: { segments: normalizedOffers },
-    spin: { sequence: steps, maxDiscount, minPayable },
-    adminPin: newPin || SETTINGS.adminPin,
-  };
-
-  try {
-    persistSettings(next);
-  } catch {
-    adminError.textContent = 'Could not save. The QR photo may be too large for this browser.';
-    return;
-  }
-
-  SETTINGS = next;
-  applySettings();
-  renderMenu();
-  resetOrder();
-  closeAdmin();
-  showToast('Settings saved');
-  playSuccess();
-}
-
-function resetAdminSettings() {
-  if (!window.confirm('Reset all local settings to defaults? This also clears the current order.')) return;
-  SETTINGS = clone(DEFAULT_SETTINGS);
-  try {
-    persistSettings(SETTINGS);
-  } catch {
-    adminError.textContent = 'Could not reset the saved settings.';
-    return;
-  }
-  applySettings();
-  renderMenu();
-  resetOrder();
-  closeAdmin();
-  showToast('Defaults restored');
-  playSuccess();
 }
 
 /* ==================================================================
@@ -1620,77 +1071,6 @@ newOrderBtn.addEventListener('click', () => {
   resetOrder();
 });
 
-$('#admin-btn').addEventListener('click', openAdmin);
-document.querySelectorAll('[data-admin-close]').forEach((element) => {
-  element.addEventListener('click', closeAdmin);
-});
-pinForm.addEventListener('submit', submitPin);
-adminForm.addEventListener('submit', saveAdminSettings);
-
-$('#admin-qr-file').addEventListener('change', async (event) => {
-  const file = event.target.files?.[0];
-  await handleQrUpload(file);
-  event.target.value = '';
-});
-
-$('#admin-qr-remove').addEventListener('click', () => {
-  adminImage = '';
-  $('#admin-qr-mode').value = 'dynamic';
-  renderAdminQrPreview();
-  adminError.textContent = '';
-});
-
-$('#admin-add-offer').addEventListener('click', addAdminOffer);
-$('#admin-add-sequence').addEventListener('click', addAdminSequenceStep);
-
-adminOfferRows.addEventListener('input', (event) => {
-  const row = event.target.closest('.admin-offer-row');
-  if (!row) return;
-  const label = row.querySelector('[data-offer="label"]');
-  const percent = row.querySelector('[data-offer="percent"]');
-
-  if (event.target === percent) {
-    const value = percent.value.trim();
-    if (!value || !Number.isFinite(Number(value))) return;
-    if (/^(\d+(?:\.\d+)?)?%\s*OFF$/i.test(label.value.trim())) label.value = `${value}% OFF`;
-    return;
-  }
-  if (event.target === label) {
-    const match = label.value.trim().match(/^(\d+(?:\.\d+)?)%\s*OFF$/i);
-    if (match) percent.value = String(Number(match[1]));
-    return;
-  }
-  if (event.target.matches('[data-offer="weight"]')) updateWheelTotal();
-});
-
-adminOfferRows.addEventListener('change', () => {
-  adminOffers = readAdminOffers();
-  adminSequence = readAdminSequence();
-  renderAdminSequence();
-});
-
-adminOfferRows.addEventListener('click', (event) => {
-  const remove = event.target.closest('[data-remove-offer]');
-  if (!remove) return;
-  adminOffers = readAdminOffers();
-  adminSequence = readAdminSequence();
-  const id = remove.dataset.removeOffer;
-  adminOffers = adminOffers.filter((offer) => offer.id !== id);
-  adminSequence = adminSequence.filter((offerId) => offerId !== id);
-  renderAdminOffers();
-  renderAdminSequence();
-});
-
-adminSequenceRows.addEventListener('click', (event) => {
-  const remove = event.target.closest('[data-remove-sequence]');
-  if (!remove) return;
-  adminSequence = readAdminSequence();
-  adminSequence.splice(Number(remove.dataset.removeSequence), 1);
-  renderAdminSequence();
-});
-
-$('#admin-reset').addEventListener('click', resetAdminSettings);
-
 $('#close-wheel').addEventListener('click', closeWheel);
 
 $('#wheel-stage').addEventListener('click', (event) => {
@@ -1723,7 +1103,7 @@ muteBtn.addEventListener('click', () => {
 document.addEventListener(
   'pointerdown',
   (event) => {
-    if (!event.target.closest('button, .drink-card, .file-btn, [data-admin-close]')) return;
+    if (!event.target.closest('button, .drink-card')) return;
     playClick();
   },
   { capture: true },
@@ -1736,10 +1116,6 @@ function updateMuteButton() {
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  if (adminOverlay.classList.contains('is-open')) {
-    closeAdmin();
-    return;
-  }
   if (overlay.classList.contains('is-open')) closeWheel();
 });
 
@@ -1765,22 +1141,15 @@ document.querySelectorAll('[data-home]').forEach((link) => {
   link.addEventListener('click', (event) => event.preventDefault());
 });
 
-// If settings are saved in another tab, pick them up here and drop any
-// order that was priced with the old offers so the payment cannot be stale.
-window.addEventListener('storage', (event) => {
-  if (event.key !== SETTINGS_KEY || !event.newValue) return;
-  SETTINGS = loadSettings();
-  applySettings();
-  renderMenu();
-  resetOrder();
-  showToast('Settings updated');
-});
-
 /* ==================================================================
    BOOT
    ================================================================== */
 
-function boot() {
+async function boot() {
+  SETTINGS = normalizeSettings(readSettingsCache());
+  settingsSignature = JSON.stringify(SETTINGS);
+  await syncSettings({ initial: true });
+
   applySettings();
   $('#brand-mark').innerHTML = logoMark();
   updateMuteButton();
@@ -1788,6 +1157,11 @@ function boot() {
   renderMenu();
   showScreen('menu');
   resetWheelUI();
+
+  setInterval(() => syncSettings(), 5000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncSettings();
+  });
 }
 
 boot();

@@ -1,5 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApi } from './server/api.js';
@@ -7,6 +8,15 @@ import { backend, store } from './server/store.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 5173);
+
+function lanAddress() {
+  for (const addresses of Object.values(os.networkInterfaces())) {
+    for (const address of addresses || []) {
+      if (address.family === 'IPv4' && !address.internal) return address.address;
+    }
+  }
+  return '';
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -30,6 +40,8 @@ const PAGES = {
   '/chef/': 'chef.html',
   '/analytics': 'analytics.html',
   '/analytics/': 'analytics.html',
+  '/settings': 'settings.html',
+  '/settings/': 'settings.html',
 };
 
 function sendFile(res, filePath) {
@@ -101,6 +113,9 @@ http
     console.log(`  Order screen : http://localhost:${port}`);
     console.log(`  Chef panel   : http://localhost:${port}/chef`);
     console.log(`  Analytics    : http://localhost:${port}/analytics`);
+    console.log(`  Settings     : http://localhost:${port}/settings`);
+    const lan = lanAddress();
+    if (lan) console.log(`  Other devices: http://${lan}:${port}`);
     console.log(
       `  Storage      : ${backend === 'supabase' ? 'Supabase' : 'local SQLite (data/orders.db)'}`,
     );

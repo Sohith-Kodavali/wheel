@@ -1,6 +1,15 @@
+import crypto from 'node:crypto';
 import { store } from './store.js';
 
 const MAX_BODY = 64 * 1024;
+const MAX_SETTINGS_BODY = 2 * 1024 * 1024;
+const SETTINGS_VERSION = 3;
+const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
+const COOKIE_NAME = 'msf_admin';
+const SESSION_TTL = 12 * 60 * 60 * 1000;
+
+const sessions = new Map();
+const loginAttempts = new Map();
 
 function sendJson(res, status, data) {
   const body = JSON.stringify(data);
@@ -12,14 +21,14 @@ function sendJson(res, status, data) {
   res.end(body);
 }
 
-function readJson(req) {
+function readJson(req, limit = MAX_BODY) {
   return new Promise((resolve, reject) => {
     let body = '';
     let size = 0;
 
     req.on('data', (chunk) => {
       size += chunk.length;
-      if (size > MAX_BODY) {
+      if (size > limit) {
         reject(new Error('Payload too large'));
         req.destroy();
         return;
@@ -35,6 +44,77 @@ function readJson(req) {
     });
     req.on('error', reject);
   });
+}
+
+function parseCookies(req) {
+  const result = {};
+  const header = req.headers.cookie || '';
+  for (const part of header.split(';')) {
+    const index = part.indexOf('=');
+    if (index === -1) continue;
+    const key = part.slice(0, index).trim();
+    if (!key) continue;
+    const value = part.slice(index + 1).trim();
+    try {
+      result[key] = decodeURIComponent(value);
+    } catch {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function currentSession(req) {
+  const token = parseCookies(req)[COOKIE_NAME];
+  if (!token) return null;
+  const expires = sessions.get(token);
+  if (!expires) return null;
+  if (Date.now() > expires) {
+    sessions.delete(token);
+    return null;
+  }
+  return token;
+}
+
+function isAuthed(req) {
+  return Boolean(currentSession(req));
+}
+
+function cookieHeader(value, maxAge) {
+  const parts = [`${COOKIE_NAME}=${value}`, 'HttpOnly', 'SameSite=Strict', 'Path=/', `Max-Age=${maxAge}`];
+  if (process.env.COOKIE_SECURE === '1') parts.push('Secure');
+  return parts.join('; ');
+}
+
+function setSession(res, token) {
+  res.setHeader('Set-Cookie', cookieHeader(token, SESSION_TTL / 1000));
+}
+
+function clearSession(res) {
+  res.setHeader('Set-Cookie', cookieHeader('', 0));
+}
+
+function hashPin(pin) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  return { hash: crypto.scryptSync(pin, salt, 32).toString('hex'), salt };
+}
+
+function pinMatches(pin, record) {
+  if (!record?.hash || !record?.salt) return pin === '1234';
+  const candidate = crypto.scryptSync(pin, record.salt, 32);
+  const expected = Buffer.from(record.hash, 'hex');
+  return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected);
+}
+
+function loginAllowed(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.reset) {
+    loginAttempts.set(ip, { count: 1, reset: now + 10 * 60 * 1000 });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= 10;
 }
 
 function validateOrder(body) {
@@ -81,6 +161,101 @@ function validateOrder(body) {
   };
 }
 
+function validateSettings(body) {
+  if (!body || typeof body !== 'object') return { error: 'Send settings.' };
+
+  const settings = body.settings;
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    return { error: 'Invalid settings.' };
+  }
+
+  let pin = null;
+  if (body.pin !== undefined && body.pin !== '') {
+    if (typeof body.pin !== 'string' || !/^\d{4,8}$/.test(body.pin)) {
+      return { error: 'The admin PIN must be 4–8 digits.' };
+    }
+    pin = body.pin;
+  }
+
+  const upiId = typeof settings.upi?.id === 'string' ? settings.upi.id.trim() : '';
+  if (!UPI_PATTERN.test(upiId)) return { error: 'Invalid UPI ID.' };
+
+  const upiName = typeof settings.upi?.name === 'string' ? settings.upi.name.trim() : '';
+  if (upiName.length < 2 || upiName.length > 60) return { error: 'UPI name must be 2–60 characters.' };
+
+  const qrMode = settings.qr?.mode;
+  if (!['dynamic', 'uploaded'].includes(qrMode)) return { error: 'Invalid QR mode.' };
+  const qrImage = typeof settings.qr?.image === 'string' ? settings.qr.image : '';
+  if (qrImage && !qrImage.startsWith('data:image/')) return { error: 'Invalid QR image.' };
+  if (qrImage.length > 1_800_000) return { error: 'QR image is too large.' };
+  if (qrMode === 'uploaded' && !qrImage) return { error: 'Upload a QR photo first.' };
+
+  if (!settings.menu || typeof settings.menu !== 'object' || Array.isArray(settings.menu)) {
+    return { error: 'Invalid menu.' };
+  }
+  const menuKeys = Object.keys(settings.menu);
+  if (menuKeys.length > 40) return { error: 'Too many menu overrides.' };
+  const menu = {};
+  for (const id of menuKeys) {
+    if (!/^[a-zA-Z0-9-]{1,40}$/.test(id)) return { error: 'Invalid menu item.' };
+    const price = Math.trunc(Number(settings.menu[id]?.price));
+    if (!Number.isInteger(price) || price <= 0 || price > 1_000_000) {
+      return { error: 'Invalid menu price.' };
+    }
+    menu[id] = { price };
+  }
+
+  if (!Array.isArray(settings.wheel?.segments)) return { error: 'Invalid wheel.' };
+  if (settings.wheel.segments.length < 2 || settings.wheel.segments.length > 16) {
+    return { error: 'Add 2–16 wheel offers.' };
+  }
+
+  const segments = [];
+  const offerIds = new Set();
+  for (const segment of settings.wheel.segments) {
+    const id = typeof segment?.id === 'string' ? segment.id.trim().slice(0, 40) : '';
+    const label = typeof segment?.label === 'string' ? segment.label.trim().slice(0, 24) : '';
+    const percent = Number(segment?.percent);
+    const weight = Number(segment?.weight);
+    const color = typeof segment?.color === 'string' ? segment.color : '';
+
+    if (!id || offerIds.has(id) || !label) return { error: 'Invalid wheel offer.' };
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { error: 'Invalid offer discount.' };
+    if (!Number.isFinite(weight) || weight <= 0) return { error: 'Invalid offer weight.' };
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return { error: 'Invalid offer colour.' };
+
+    offerIds.add(id);
+    segments.push({ id, label, percent, weight, color });
+  }
+
+  if (!Array.isArray(settings.spin?.sequence)) return { error: 'Invalid spin sequence.' };
+  const sequence = settings.spin.sequence.map(String).filter((id) => offerIds.has(id));
+  if (sequence.length < 1 || sequence.length > 60) return { error: 'Add 1–60 spin steps.' };
+
+  const maxDiscount = Math.trunc(Number(settings.spin.maxDiscount));
+  const minPayable = Math.trunc(Number(settings.spin.minPayable));
+  if (!Number.isInteger(maxDiscount) || maxDiscount < 0 || maxDiscount > 1_000_000) {
+    return { error: 'Invalid max discount.' };
+  }
+  if (!Number.isInteger(minPayable) || minPayable < 0 || minPayable > 1_000_000) {
+    return { error: 'Invalid minimum payable.' };
+  }
+
+  return {
+    value: {
+      settings: {
+        version: SETTINGS_VERSION,
+        upi: { id: upiId, name: upiName },
+        qr: { mode: qrMode, image: qrImage },
+        menu,
+        wheel: { segments },
+        spin: { sequence, maxDiscount, minPayable },
+      },
+      pin,
+    },
+  };
+}
+
 export async function handleApi(req, res, url) {
   const { pathname } = url;
 
@@ -94,6 +269,69 @@ export async function handleApi(req, res, url) {
       }
       const order = await store.createOrder(parsed.value);
       sendJson(res, 200, { ok: true, number: order.number });
+      return;
+    }
+
+    if (pathname === '/api/settings' && req.method === 'GET') {
+      sendJson(res, 200, { settings: await store.getSettings() });
+      return;
+    }
+
+    if (pathname === '/api/settings' && req.method === 'PUT') {
+      if (!isAuthed(req)) {
+        sendJson(res, 401, { error: 'Sign in to change settings.' });
+        return;
+      }
+      const body = await readJson(req, MAX_SETTINGS_BODY);
+      const parsed = validateSettings(body);
+      if (parsed.error) {
+        sendJson(res, 400, { error: parsed.error });
+        return;
+      }
+      const pinRecord = parsed.value.pin ? hashPin(parsed.value.pin) : null;
+      await store.saveSettings(parsed.value.settings, pinRecord);
+      sendJson(res, 200, { ok: true, settings: parsed.value.settings });
+      return;
+    }
+
+    if (pathname === '/api/admin/login' && req.method === 'POST') {
+      const ip = req.socket.remoteAddress || 'unknown';
+      if (!loginAllowed(ip)) {
+        sendJson(res, 429, { error: 'Too many attempts. Wait a few minutes.' });
+        return;
+      }
+      const body = await readJson(req, 8 * 1024);
+      const pin = typeof body?.pin === 'string' ? body.pin.trim() : '';
+      if (!/^\d{4,8}$/.test(pin)) {
+        sendJson(res, 400, { error: 'Enter your 4–8 digit PIN.' });
+        return;
+      }
+      const record = await store.getPinRecord();
+      if (!pinMatches(pin, record)) {
+        sendJson(res, 401, { error: 'Wrong PIN.' });
+        return;
+      }
+      loginAttempts.delete(ip);
+      for (const [token, expires] of sessions) {
+        if (expires < Date.now()) sessions.delete(token);
+      }
+      const token = crypto.randomBytes(32).toString('hex');
+      sessions.set(token, Date.now() + SESSION_TTL);
+      setSession(res, token);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (pathname === '/api/admin/logout' && req.method === 'POST') {
+      const token = currentSession(req);
+      if (token) sessions.delete(token);
+      clearSession(res);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (pathname === '/api/admin/session' && req.method === 'GET') {
+      sendJson(res, 200, { authed: isAuthed(req) });
       return;
     }
 
@@ -128,7 +366,7 @@ export async function handleApi(req, res, url) {
       return;
     }
     if (error.message === 'Payload too large') {
-      if (!res.headersSent) sendJson(res, 413, { error: 'Order payload is too large.' });
+      if (!res.headersSent) sendJson(res, 413, { error: 'Request payload is too large.' });
       return;
     }
     console.error('API error:', error.message);

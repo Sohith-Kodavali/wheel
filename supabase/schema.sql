@@ -27,8 +27,17 @@ create table if not exists order_items (
 create index if not exists order_items_order_id_idx on order_items (order_id);
 create index if not exists order_items_pending_idx on order_items (done, created_at);
 
+create table if not exists app_settings (
+  id smallint primary key check (id = 1),
+  data jsonb not null default '{}'::jsonb,
+  pin_hash text,
+  pin_salt text,
+  updated_at timestamptz not null default now()
+);
+
 alter table orders enable row level security;
 alter table order_items enable row level security;
+alter table app_settings enable row level security;
 
 -- No public policies on purpose: the tablet talks to the Node server, and the
 -- server uses the service role key (which bypasses RLS). Keep that key on the

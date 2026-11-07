@@ -39,6 +39,14 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_items_pending ON order_items(done, created_at);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  data TEXT NOT NULL DEFAULT '{}',
+  pin_hash TEXT,
+  pin_salt TEXT,
+  updated_at TEXT NOT NULL
+);
 `);
 
 const insertItem = db.prepare(`
@@ -133,6 +141,35 @@ function localDay(date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function getSettings() {
+  const row = db.prepare('SELECT data FROM app_settings WHERE id = 1').get();
+  if (!row) return {};
+  try {
+    return JSON.parse(row.data);
+  } catch {
+    return {};
+  }
+}
+
+export function getPinRecord() {
+  const row = db.prepare('SELECT pin_hash, pin_salt FROM app_settings WHERE id = 1').get();
+  if (!row?.pin_hash || !row?.pin_salt) return null;
+  return { hash: row.pin_hash, salt: row.pin_salt };
+}
+
+export function saveSettings(settings, pin) {
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO app_settings (id, data, pin_hash, pin_salt, updated_at)
+     VALUES (1, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       data = excluded.data,
+       pin_hash = COALESCE(excluded.pin_hash, app_settings.pin_hash),
+       pin_salt = COALESCE(excluded.pin_salt, app_settings.pin_salt),
+       updated_at = excluded.updated_at`,
+  ).run(JSON.stringify(settings), pin?.hash ?? null, pin?.salt ?? null, now);
 }
 
 export function analytics() {

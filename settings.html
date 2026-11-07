@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Settings — The Milkshake Factory</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#fff7ec" />
+    <meta name="description" content="Shared menu, prices and payment settings for The Milkshake Factory." />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/style.css" />
+    <link rel="stylesheet" href="./css/settings.css" />
+  </head>
+  <body class="settings-body">
+    <div class="ambient" aria-hidden="true">
+      <div class="ambient-blob blob-a"></div>
+      <div class="ambient-blob blob-b"></div>
+      <div class="ambient-dots"></div>
+    </div>
+
+    <div class="settings-page">
+      <header class="settings-head">
+        <div class="brand">
+          <span class="brand-mark settings-brand">MF</span>
+          <span class="brand-copy">
+            <strong>The Milkshake Factory</strong>
+            <small>SIP • CHILL • REPEAT</small>
+          </span>
+        </div>
+        <nav class="settings-links" aria-label="Staff pages">
+          <a href="/">Order screen</a>
+          <a href="/chef">Kitchen</a>
+          <a href="/analytics">Analytics</a>
+        </nav>
+      </header>
+
+      <section class="admin-panel settings-panel" aria-labelledby="settings-title">
+        <header class="admin-head">
+          <div>
+            <span class="eyebrow">Staff only</span>
+            <h2 id="settings-title">Settings</h2>
+            <p>Changes apply to every device within a few seconds.</p>
+          </div>
+        </header>
+
+        <div class="admin-lock" id="admin-lock">
+          <span class="admin-lock-icon">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 10V7a5 5 0 0 1 10 0v3" />
+              <rect x="4" y="10" width="16" height="11" rx="2.5" />
+            </svg>
+          </span>
+          <h3>Staff sign in</h3>
+          <p>Enter the admin PIN. The default is 1234.</p>
+          <form class="admin-pin-form" id="pin-form">
+            <input
+              class="admin-input admin-pin"
+              id="pin-input"
+              type="password"
+              inputmode="numeric"
+              maxlength="8"
+              autocomplete="current-password"
+              aria-label="Admin PIN"
+              placeholder="Admin PIN"
+            />
+            <button class="btn btn-primary" type="submit">Unlock</button>
+          </form>
+          <p class="admin-error" id="pin-error" role="alert"></p>
+        </div>
+
+        <div id="admin-content" hidden>
+          <form id="admin-form">
+            <section class="admin-section">
+              <h3>Payment</h3>
+              <div class="admin-grid">
+                <label class="admin-field">
+                  UPI ID
+                  <input class="admin-input" id="admin-upi-id" type="text" autocomplete="off" placeholder="stall@bank" />
+                </label>
+                <label class="admin-field">
+                  UPI display name
+                  <input class="admin-input" id="admin-upi-name" type="text" maxlength="60" placeholder="The Milkshake Factory" />
+                </label>
+              </div>
+              <label class="admin-field">
+                QR on the payment screen
+                <select class="admin-input" id="admin-qr-mode">
+                  <option value="dynamic">Generated QR — includes the exact amount</option>
+                  <option value="uploaded">Uploaded stall QR photo</option>
+                </select>
+              </label>
+              <div class="admin-qr-row">
+                <div class="admin-qr-preview" id="admin-qr-preview"></div>
+                <div class="admin-qr-controls">
+                  <label class="file-btn">
+                    Upload QR photo
+                    <input type="file" id="admin-qr-file" accept="image/png,image/jpeg,image/webp" />
+                  </label>
+                  <button class="btn btn-ghost" type="button" id="admin-qr-remove">Remove photo</button>
+                  <p class="admin-hint">
+                    Stored with the shared settings and sent to every device. A static stall QR cannot include the
+                    amount — use the generated QR if you want the exact total built in.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-section">
+              <h3>Menu prices</h3>
+              <div class="admin-menu-head">
+                <span>Drink</span>
+                <span>Price ₹</span>
+              </div>
+              <div id="admin-menu-rows"></div>
+              <p class="admin-hint">Prices are in rupees and apply to every device.</p>
+            </section>
+
+            <section class="admin-section">
+              <h3>Wheel offers</h3>
+              <p class="admin-hint">
+                Discount % is what the customer pays. Wheel % is how much of the wheel that slice takes. Sizes are
+                scaled to fill the whole wheel.
+              </p>
+              <div class="admin-offer-head">
+                <span>Label</span>
+                <span>Discount</span>
+                <span>Wheel %</span>
+                <span>Colour</span>
+                <span></span>
+              </div>
+              <div id="admin-offer-rows"></div>
+              <div class="admin-offer-foot">
+                <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-offer">+ Add offer</button>
+                <span class="admin-wheel-total" id="admin-wheel-total">Wheel total: 100%</span>
+              </div>
+            </section>
+
+            <section class="admin-section">
+              <h3>Spin sequence</h3>
+              <p class="admin-hint">
+                The wheel lands on these offers in order, one per spin, then repeats. Add a step for each spin.
+              </p>
+              <div id="admin-sequence-rows"></div>
+              <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-sequence">+ Add step</button>
+              <div class="admin-grid admin-limits">
+                <label class="admin-field">
+                  Max discount ₹
+                  <input class="admin-input" id="admin-max" type="number" min="0" step="1" />
+                </label>
+                <label class="admin-field">
+                  Minimum payable ₹
+                  <input class="admin-input" id="admin-min" type="number" min="0" step="1" />
+                </label>
+              </div>
+            </section>
+
+            <section class="admin-section">
+              <h3>Admin PIN</h3>
+              <label class="admin-field">
+                New PIN (4–8 digits)
+                <input
+                  class="admin-input"
+                  id="admin-new-pin"
+                  type="password"
+                  inputmode="numeric"
+                  maxlength="8"
+                  autocomplete="new-password"
+                  placeholder="Leave blank to keep the current PIN"
+                />
+              </label>
+              <p class="admin-hint">The PIN is checked on the server and is not shared with customer devices.</p>
+            </section>
+
+            <div class="admin-footer">
+              <p class="admin-error" id="admin-error" role="alert"></p>
+              <div class="admin-actions">
+                <button class="btn btn-text" type="button" id="admin-reset">Reset defaults</button>
+                <div class="admin-actions-right">
+                  <button class="btn btn-ghost" type="button" id="admin-logout">Log out</button>
+                  <button class="btn btn-primary" type="submit">Save settings</button>
+                </div>
+              </div>
+              <p class="admin-hint admin-save-note">Saving updates the order screen on every device.</p>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/settings.js"></script>
+  </body>
+</html>

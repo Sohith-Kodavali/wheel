@@ -6,7 +6,7 @@ A deliberately small kiosk for the stall tablet. Three screens only:
 2. **Total + Spin & Win** — review the order; on ₹100+ orders spin the rigged wheel for a discount or pay without spinning. Under ₹100 it goes straight to payment.
 3. **Pay** — a UPI QR for the exact amount.
 
-No admin panel for customers, and the tablet UI stays plain HTML, CSS and JavaScript. Orders, the kitchen queue and sales numbers live in a small local backend (Node's built-in `node:sqlite`), and the QR is generated in the browser from the configured UPI ID and the exact payable amount.
+No admin panel for customers, and the tablet UI stays plain HTML, CSS and JavaScript. Orders, the kitchen queue, sales numbers and the shared menu/settings live in a small backend (Supabase, with a local SQLite fallback), and the QR is generated in the browser from the configured UPI ID and the exact payable amount.
 
 ## Run it
 
@@ -18,12 +18,13 @@ npm start
 - **Order screen (tablet):** <http://localhost:5173>
 - **Kitchen queue:** <http://localhost:5173/chef>
 - **Analytics:** <http://localhost:5173/analytics>
+- **Settings (admin):** <http://localhost:5173/settings>
 
 There are no dependencies to install.
 
 `npm start` loads `.env` automatically if it exists (Node 22.5+). Without Supabase settings the server falls back to the local SQLite file.
 
-> Use `serve.js` for the order screen as well — every tablet and the chef screen need its API. Opening `index.html` directly from the filesystem will not work because the app uses ES modules. If tablets run separate servers, point them all at the same Supabase project so they share one order queue.
+> Use `serve.js` for every screen. Menu prices, UPI details, the wheel and the admin PIN are stored once in Supabase, so changing them from the settings page updates every device within about five seconds. Orders, the kitchen queue and analytics are shared the same way.
 
 For a stall:
 
@@ -31,11 +32,11 @@ For a stall:
 2. Tap the fullscreen button in the top-right corner.
 3. Set the tablet to landscape and keep it on charge.
 4. Optionally enable Chrome kiosk mode / keep the screen awake in Android settings.
-5. Open <http://localhost:5173/chef> on a second screen or phone for the kitchen.
+5. Open the server's **Other devices** URL (printed on startup) on the kitchen phone, the admin phone and any extra order tablets — not `localhost`.
 
 ## Supabase
 
-Orders and analytics live in Supabase. To connect it:
+Orders, analytics and the shared settings live in Supabase. To connect it:
 
 1. Create a project at <https://supabase.com>.
 2. Open **SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql), and run it.
@@ -45,7 +46,9 @@ Orders and analytics live in Supabase. To connect it:
    - On older projects, use the legacy `service_role` key as `SUPABASE_SERVICE_ROLE_KEY` instead.
 4. Run `npm start` and check that the server prints `Storage : Supabase` and `Supabase : connected`.
 
-The schema enables row-level security with no public policies. The **secret / service role key bypasses RLS**, so keep it only in the server's `.env` — never in the browser, the tablet app, or git. Tables are not readable with the publishable key.
+The schema creates `orders`, `order_items` and `app_settings`, and enables row-level security with no public policies. The **secret / service role key bypasses RLS**, so keep it only in the server's `.env` — never in the browser, the tablet app, or git. Tables are not readable with the publishable key.
+
+The admin PIN is stored server-side as a salted scrypt hash; only `/settings` asks for it, and the server sets an HttpOnly session cookie after sign-in.
 
 If `SUPABASE_URL` or the key is missing, the server quietly uses the local SQLite fallback (`data/orders.db`) so the stall can keep selling.
 
@@ -76,17 +79,19 @@ The chef and analytics pages have no login. Keep them on the stall's local netwo
 - Once a drink is marked done, later tablet edits cannot recreate it.
 - The tablet posts the order when the payment screen opens. There is no payment verification in this app — staff still confirm the UPI payment manually.
 
-## Local admin — per tablet
+## Settings — shared across devices
 
-Tap the **Settings** button (gear icon) in the top-right corner.
+Open <http://localhost:5173/settings> on the admin phone or any device.
 
-- Default PIN: **`1234`** — change it in the admin panel after the first login.
-- Settings are stored in this tablet's browser `localStorage`. Orders, the kitchen queue and analytics are shared through Supabase (or the local SQLite fallback), but **menu prices, wheel offers, the spin sequence, UPI details and the PIN are per device**. Editing them on one tablet does not change another tablet.
+- Default PIN: **`1234`** — change it under **Admin PIN** after the first sign-in.
+- The PIN is checked on the server and stored as a salted scrypt hash. A successful sign-in sets an HttpOnly session cookie for 12 hours.
+- Saving pushes the configuration to Supabase. Every order screen polls every five seconds and re-renders, so a price or wheel change reaches all devices without a reload.
+- **Log out** clears the session. The settings page never shows orders or customer details.
 
 You can change:
 
 - **UPI ID and display name.**
-- **The UPI QR photo** — upload a PNG/JPG/WebP of the stall's scanner. It is resized locally and saved as a data URL in the browser.
+- **The UPI QR photo** — upload a PNG/JPG/WebP of the stall's scanner. It is resized in the browser and stored as a data URL in the shared settings.
 - **QR mode on the payment screen** — use the uploaded stall QR, or the generated QR that already contains the exact amount.
 - **Menu prices** — one price for every drink.
 - **Wheel offers** — add, edit or remove the slices on the wheel (label, discount, wheel share and colour).
@@ -97,21 +102,19 @@ You can change:
 
 A photo of a normal stall QR does **not** contain the order amount. If you choose the uploaded photo, the pay screen shows the amount and tells the customer to enter it in their UPI app. The **generated QR** encodes the UPI ID and the exact amount, so the customer does not have to type it.
 
-- The photo lives on that one tablet. Clearing Chrome's site data removes it.
-- For multiple tablets, either upload the photo on each one, or connect Supabase later so all tablets share the same settings.
-- The PIN is only a local staff gate (it keeps customers out of the settings screen); it is not encryption.
-
-If the PIN is forgotten, clear the site's localStorage/history for the page; the defaults (including PIN `1234`) return.
+- The photo is part of the shared settings and is served to every device.
+- The PIN only gates the settings page; it is not encryption.
+- If the PIN is forgotten while a settings row exists, clear `pin_hash` and `pin_salt` in the `app_settings` table — the default `1234` works again.
 
 ## Defaults in code
 
-The admin panel overrides the fallbacks in `js/app.js`. The default menu, prices, wheel offers and spin sequence live at the top of that file in `DEFAULT_MENU`, `DEFAULT_WHEEL` and `DEFAULT_SETTINGS`.
+The shared settings override the fallbacks in `js/config.js`. The default menu, prices, wheel offers and spin sequence live there in `DEFAULT_MENU`, `DEFAULT_WHEEL` and `DEFAULT_SETTINGS`.
 
-- **Rigging:** the wheel does not use random probabilities. Each spin takes the next offer from the saved sequence and stops on that slice. Every spin wins. Both the offers and the sequence are edited from the admin panel.
-- **Wheel area:** each offer has a **Wheel %** that sets its slice size. The admin shows the running total and scales the slices to fill the wheel when you save.
+- **Rigging:** the wheel does not use random probabilities. Each spin takes the next offer from the saved sequence and stops on that slice. Every spin wins. Both the offers and the sequence are edited from the settings page.
+- **Wheel area:** each offer has a **Wheel %** that sets its slice size. The settings page shows the running total and scales the slices to fill the wheel when you save.
 - **Spin minimum:** the wheel unlocks at ₹100. Below that the bottom bar shows how much more is needed, and the total screen goes straight to payment.
 - **Discount:** taken from the order total, then capped by the max discount and minimum payable settings.
-- **Prices and menu:** every item has a single `price` in paise (`7500` = ₹75). The admin panel edits the live prices; the defaults are in `DEFAULT_MENU`.
+- **Prices and menu:** every item has a single `price` in paise (`7500` = ₹75). The settings page edits the live prices; the defaults are in `DEFAULT_MENU`.
 
 ### Prices
 

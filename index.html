@@ -54,10 +54,6 @@
         <rect x="4" y="14" width="6" height="6" rx="1.5" />
         <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" />
       </symbol>
-      <symbol id="i-gear" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="3.2" />
-        <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.1.36.32.68.6 1 .3.26.68.4 1.1.4H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
-      </symbol>
       <symbol id="i-trash" viewBox="0 0 24 24">
         <path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M6 7l1 12.2A2 2 0 0 0 9 21h6a2 2 0 0 0 2-1.8L18 7" />
       </symbol>
@@ -95,10 +91,6 @@
         </div>
 
         <div class="topbar-actions">
-          <button class="btn btn-ghost settings-btn" type="button" id="admin-btn" aria-label="Staff settings" title="Staff settings">
-            <svg class="ico"><use href="#i-gear" /></svg>
-            <span>Settings</span>
-          </button>
           <button class="icon-btn" type="button" id="fullscreen-btn" aria-label="Toggle fullscreen" title="Fullscreen">
             <svg class="ico"><use href="#i-expand" /></svg>
           </button>
@@ -305,164 +297,6 @@
     </div>
 
     <div class="flash" id="flash" aria-hidden="true"></div>
-
-    <!-- ------------------------------------------------ LOCAL ADMIN -->
-    <div class="admin-overlay" id="admin-overlay" aria-hidden="true">
-      <div class="admin-shade" data-admin-close></div>
-      <section class="admin-panel" role="dialog" aria-modal="true" aria-labelledby="admin-title">
-        <header class="admin-head">
-          <div>
-            <span class="eyebrow">Staff settings</span>
-            <h2 id="admin-title">Local admin</h2>
-            <p>Saved in this tablet's browser · no backend needed</p>
-          </div>
-          <button class="icon-btn" type="button" data-admin-close aria-label="Close admin">
-            <svg class="ico"><use href="#i-close" /></svg>
-          </button>
-        </header>
-
-        <div class="admin-lock" id="admin-lock">
-          <span class="admin-lock-icon"><svg class="ico"><use href="#i-gear" /></svg></span>
-          <h3>Staff only</h3>
-          <p>Enter the admin PIN to edit prices, UPI details and the QR photo.</p>
-          <form class="admin-pin-form" id="pin-form">
-            <input
-              class="admin-input admin-pin"
-              id="pin-input"
-              type="password"
-              inputmode="numeric"
-              maxlength="8"
-              autocomplete="off"
-              aria-label="Admin PIN"
-              placeholder="Admin PIN"
-            />
-            <button class="btn btn-primary" type="submit">Unlock</button>
-          </form>
-          <p class="admin-error" id="pin-error" role="alert"></p>
-        </div>
-
-        <div id="admin-content" hidden>
-          <form id="admin-form">
-            <section class="admin-section">
-              <h3>Payment</h3>
-              <div class="admin-grid">
-                <label class="admin-field">
-                  UPI ID
-                  <input class="admin-input" id="admin-upi-id" type="text" autocomplete="off" placeholder="stall@bank" />
-                </label>
-                <label class="admin-field">
-                  UPI display name
-                  <input class="admin-input" id="admin-upi-name" type="text" maxlength="60" placeholder="The Milkshake Factory" />
-                </label>
-              </div>
-              <label class="admin-field">
-                QR on the payment screen
-                <select class="admin-input" id="admin-qr-mode">
-                  <option value="dynamic">Generated QR — includes the exact amount</option>
-                  <option value="uploaded">Uploaded stall QR photo</option>
-                </select>
-              </label>
-              <div class="admin-qr-row">
-                <div class="admin-qr-preview" id="admin-qr-preview"></div>
-                <div class="admin-qr-controls">
-                  <label class="file-btn">
-                    <svg class="ico"><use href="#i-qr" /></svg> Upload QR photo
-                    <input type="file" id="admin-qr-file" accept="image/png,image/jpeg,image/webp" />
-                  </label>
-                  <button class="btn btn-ghost" type="button" id="admin-qr-remove">Remove photo</button>
-                  <p class="admin-hint">
-                    Stored locally on this tablet. Make sure the photo belongs to the UPI ID above. A static stall QR
-                    cannot include the amount — the customer enters the amount shown. Use the generated QR if you
-                    want the amount to be automatic.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section class="admin-section">
-              <h3>Menu prices</h3>
-              <div class="admin-menu-head">
-                <span>Drink</span>
-                <span>Price ₹</span>
-              </div>
-              <div id="admin-menu-rows"></div>
-              <p class="admin-hint">Prices are in rupees.</p>
-            </section>
-
-            <section class="admin-section">
-              <h3>Wheel offers</h3>
-              <p class="admin-hint">
-                Discount % is what the customer pays. Wheel % is how much of the wheel that slice takes.
-                Sizes are scaled to fill the whole wheel.
-              </p>
-              <div class="admin-offer-head">
-                <span>Label</span>
-                <span>Discount</span>
-                <span>Wheel %</span>
-                <span>Colour</span>
-                <span></span>
-              </div>
-              <div id="admin-offer-rows"></div>
-              <div class="admin-offer-foot">
-                <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-offer">
-                  + Add offer
-                </button>
-                <span class="admin-wheel-total" id="admin-wheel-total">Wheel total: 100%</span>
-              </div>
-            </section>
-
-            <section class="admin-section">
-              <h3>Spin sequence</h3>
-              <p class="admin-hint">
-                The wheel lands on these offers in order, one per spin, then repeats. Add a step for each spin.
-              </p>
-              <div id="admin-sequence-rows"></div>
-              <button class="btn btn-ghost admin-add-btn" type="button" id="admin-add-sequence">
-                + Add step
-              </button>
-              <div class="admin-grid admin-limits">
-                <label class="admin-field">
-                  Max discount ₹
-                  <input class="admin-input" id="admin-max" type="number" min="0" step="1" />
-                </label>
-                <label class="admin-field">
-                  Minimum payable ₹
-                  <input class="admin-input" id="admin-min" type="number" min="0" step="1" />
-                </label>
-              </div>
-            </section>
-
-            <section class="admin-section">
-              <h3>Admin PIN</h3>
-              <label class="admin-field">
-                New PIN (4–8 digits)
-                <input
-                  class="admin-input"
-                  id="admin-new-pin"
-                  type="password"
-                  inputmode="numeric"
-                  maxlength="8"
-                  autocomplete="new-password"
-                  placeholder="Leave blank to keep the current PIN"
-                />
-              </label>
-            </section>
-
-            <div class="admin-footer">
-              <p class="admin-error" id="admin-error" role="alert"></p>
-              <div class="admin-actions">
-                <button class="btn btn-text" type="button" id="admin-reset">Reset defaults</button>
-                <div class="admin-actions-right">
-                  <button class="btn btn-ghost" type="button" data-admin-close>Close</button>
-                  <button class="btn btn-primary" type="submit">Save settings</button>
-                </div>
-              </div>
-              <p class="admin-hint admin-save-note">Saving applies the settings and clears the current order.</p>
-            </div>
-          </form>
-        </div>
-      </section>
-    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
