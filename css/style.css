@@ -375,6 +375,10 @@ svg {
   height: 21px;
 }
 
+a.icon-btn {
+  text-decoration: none;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;

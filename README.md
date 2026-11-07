@@ -34,6 +34,22 @@ For a stall:
 4. Optionally enable Chrome kiosk mode / keep the screen awake in Android settings.
 5. Open the server's **Other devices** URL (printed on startup) on the kitchen phone, the admin phone and any extra order tablets — not `localhost`.
 
+## Deploy on Vercel
+
+Vercel serves the pages statically and runs the API through `api/[...path].js`. `vercel.json` enables clean URLs, so `/chef`, `/analytics` and `/settings` work without `.html`.
+
+1. Import the GitHub repo into Vercel (framework preset **Other**, no build command).
+2. Add these Environment Variables for Production and Preview:
+   - `SUPABASE_URL`
+   - `SUPABASE_SECRET_KEY`
+   - `ADMIN_SESSION_SECRET` — any long random string (signs the admin cookie)
+   - `COOKIE_SECURE=1`
+3. Deploy.
+
+Every `/api/*` request goes to the same serverless function, so orders, the chef queue, analytics and settings work exactly like the local server. Vercel's filesystem is read-only and stateless, so the SQLite fallback is not used there — Supabase is required.
+
+**GitHub Pages cannot run this project.** It only serves files, so `/api/*` would 404 and the chef, settings and order screens would show connection errors.
+
 ## Supabase
 
 Orders, analytics and the shared settings live in Supabase. To connect it:

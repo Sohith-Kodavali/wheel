@@ -7,8 +7,9 @@ const SETTINGS_VERSION = 3;
 const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
 const COOKIE_NAME = 'msf_admin';
 const SESSION_TTL = 12 * 60 * 60 * 1000;
+const SESSION_SECRET =
+  process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SECRET_KEY || 'milkshake-dev-session';
 
-const sessions = new Map();
 const loginAttempts = new Map();
 
 function sendJson(res, status, data) {
@@ -22,6 +23,25 @@ function sendJson(res, status, data) {
 }
 
 function readJson(req, limit = MAX_BODY) {
+  if (req.body !== undefined) {
+    let body = req.body;
+    if (Buffer.isBuffer(body)) body = body.toString('utf8');
+    if (body === null || body === '') return Promise.resolve(null);
+    if (typeof body === 'string') {
+      if (body.length > limit) return Promise.reject(new Error('Payload too large'));
+      try {
+        return Promise.resolve(JSON.parse(body));
+      } catch {
+        return Promise.reject(new Error('Invalid JSON'));
+      }
+    }
+    if (typeof body === 'object') {
+      if (JSON.stringify(body).length > limit) return Promise.reject(new Error('Payload too large'));
+      return Promise.resolve(body);
+    }
+    return Promise.reject(new Error('Invalid JSON'));
+  }
+
   return new Promise((resolve, reject) => {
     let body = '';
     let size = 0;
@@ -64,34 +84,44 @@ function parseCookies(req) {
   return result;
 }
 
-function currentSession(req) {
-  const token = parseCookies(req)[COOKIE_NAME];
-  if (!token) return null;
-  const expires = sessions.get(token);
-  if (!expires) return null;
-  if (Date.now() > expires) {
-    sessions.delete(token);
-    return null;
-  }
-  return token;
+function signExpiry(expires) {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(String(expires)).digest('hex');
+}
+
+function sessionToken() {
+  const expires = Date.now() + SESSION_TTL;
+  return `${expires}.${signExpiry(expires)}`;
+}
+
+function validSession(token) {
+  if (!token) return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const expires = Number(parts[0]);
+  if (!Number.isFinite(expires) || expires < Date.now()) return false;
+  const expected = Buffer.from(signExpiry(expires), 'hex');
+  const actual = Buffer.from(parts[1], 'hex');
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 
 function isAuthed(req) {
-  return Boolean(currentSession(req));
+  return validSession(parseCookies(req)[COOKIE_NAME]);
 }
 
-function cookieHeader(value, maxAge) {
+function cookieHeader(req, value, maxAge) {
+  const secure =
+    process.env.COOKIE_SECURE === '1' || String(req.headers['x-forwarded-proto'] || '') === 'https';
   const parts = [`${COOKIE_NAME}=${value}`, 'HttpOnly', 'SameSite=Strict', 'Path=/', `Max-Age=${maxAge}`];
-  if (process.env.COOKIE_SECURE === '1') parts.push('Secure');
+  if (secure) parts.push('Secure');
   return parts.join('; ');
 }
 
-function setSession(res, token) {
-  res.setHeader('Set-Cookie', cookieHeader(token, SESSION_TTL / 1000));
+function setSession(req, res, token) {
+  res.setHeader('Set-Cookie', cookieHeader(req, token, SESSION_TTL / 1000));
 }
 
-function clearSession(res) {
-  res.setHeader('Set-Cookie', cookieHeader('', 0));
+function clearSession(req, res) {
+  res.setHeader('Set-Cookie', cookieHeader(req, '', 0));
 }
 
 function hashPin(pin) {
@@ -295,7 +325,10 @@ export async function handleApi(req, res, url) {
     }
 
     if (pathname === '/api/admin/login' && req.method === 'POST') {
-      const ip = req.socket.remoteAddress || 'unknown';
+      const forwarded = String(req.headers['x-forwarded-for'] || '')
+        .split(',')[0]
+        .trim();
+      const ip = forwarded || req.socket?.remoteAddress || 'unknown';
       if (!loginAllowed(ip)) {
         sendJson(res, 429, { error: 'Too many attempts. Wait a few minutes.' });
         return;
@@ -312,20 +345,13 @@ export async function handleApi(req, res, url) {
         return;
       }
       loginAttempts.delete(ip);
-      for (const [token, expires] of sessions) {
-        if (expires < Date.now()) sessions.delete(token);
-      }
-      const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, Date.now() + SESSION_TTL);
-      setSession(res, token);
+      setSession(req, res, sessionToken());
       sendJson(res, 200, { ok: true });
       return;
     }
 
     if (pathname === '/api/admin/logout' && req.method === 'POST') {
-      const token = currentSession(req);
-      if (token) sessions.delete(token);
-      clearSession(res);
+      clearSession(req, res);
       sendJson(res, 200, { ok: true });
       return;
     }
