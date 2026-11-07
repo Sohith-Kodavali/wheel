@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "description": "Tablet kiosk for The Milkshake Factory: menu, rigged Spin & Win, UPI QR.",
   "scripts": {
-    "start": "node serve.js"
+    "start": "node --env-file-if-exists=.env serve.js"
   }
 }

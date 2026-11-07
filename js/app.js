@@ -230,6 +230,8 @@ const state = {
   spin: null,
   sequenceIndex: 0,
   screen: 'menu',
+  orderToken: '',
+  orderSignature: '',
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -811,6 +813,45 @@ function disarmReset() {
   newOrderBtn.innerHTML = `${icon('refresh')} New order`;
 }
 
+function newOrderToken() {
+  if (window.crypto?.randomUUID) return crypto.randomUUID();
+  return `order-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function submitOrder(items, total, spin) {
+  const signature = JSON.stringify({
+    items: items.map((item) => [item.id, item.qty, item.price]),
+    total,
+    discount: spin ? spin.discount : 0,
+    percent: spin ? spin.percent : 0,
+  });
+  if (signature === state.orderSignature) return;
+
+  if (!state.orderToken) state.orderToken = newOrderToken();
+  state.orderSignature = signature;
+
+  const payload = {
+    token: state.orderToken,
+    items: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      qty: item.qty,
+      price: item.price,
+    })),
+    total,
+    discount: spin ? spin.discount : 0,
+    percent: spin ? spin.percent : 0,
+  };
+
+  fetch('/api/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {
+    state.orderSignature = '';
+  });
+}
+
 function renderPay() {
   const items = lines();
   if (!items.length) {
@@ -821,6 +862,8 @@ function renderPay() {
   const total = cartTotal();
   const spin = state.spin && state.spin.total === total && total >= SPIN_MIN_TOTAL ? state.spin : null;
   const final = spin ? spin.final : total;
+
+  submitOrder(items, total, spin);
 
   $('#pay-amount').textContent = money(final);
   $('#pay-note').textContent = spin
@@ -1472,6 +1515,8 @@ function showScreen(name) {
 function resetOrder() {
   clearSpin();
   state.cart.clear();
+  state.orderToken = '';
+  state.orderSignature = '';
   resetWheelUI();
   if (wheel) wheel.reset();
   overlay.classList.remove('is-open');

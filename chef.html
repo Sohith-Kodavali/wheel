@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Kitchen queue — The Milkshake Factory</title>
+    <meta name="theme-color" content="#fff7ec" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./css/kitchen.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark">MF</span>
+        <div>
+          <span class="kicker">The Milkshake Factory</span>
+          <h1>Kitchen queue</h1>
+        </div>
+      </div>
+      <div class="top-side">
+        <span class="pill" id="pending-pill">0 items</span>
+        <a class="quiet-link" href="/analytics">Analytics</a>
+      </div>
+    </header>
+
+    <main class="main">
+      <p class="notice" id="chef-error" role="status"></p>
+      <section class="queue" id="queue" aria-live="polite" aria-label="Drinks to prepare"></section>
+      <div class="empty" id="empty" hidden>
+        <span class="empty-mark">✓</span>
+        <h2>All caught up</h2>
+        <p>New drinks appear here the moment an order is placed.</p>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <span>Drinks served today</span>
+      <strong id="done-today">0</strong>
+    </footer>
+
+    <script type="module" src="./js/chef.js"></script>
+  </body>
+</html>

@@ -6,7 +6,7 @@ A deliberately small kiosk for the stall tablet. Three screens only:
 2. **Total + Spin & Win** — review the order; on ₹100+ orders spin the rigged wheel for a discount or pay without spinning. Under ₹100 it goes straight to payment.
 3. **Pay** — a UPI QR for the exact amount.
 
-No admin panel, no database, no order history, no backend. Everything is plain HTML, CSS and JavaScript. The QR is generated in the browser from the configured UPI ID and the exact payable amount.
+No admin panel for customers, and the tablet UI stays plain HTML, CSS and JavaScript. Orders, the kitchen queue and sales numbers live in a small local backend (Node's built-in `node:sqlite`), and the QR is generated in the browser from the configured UPI ID and the exact payable amount.
 
 ## Run it
 
@@ -15,23 +15,73 @@ cd milkshake-tablet
 npm start
 ```
 
-Open <http://localhost:5173> on the tablet. There are no dependencies to install.
+- **Order screen (tablet):** <http://localhost:5173>
+- **Kitchen queue:** <http://localhost:5173/chef>
+- **Analytics:** <http://localhost:5173/analytics>
 
-> If you prefer, any static file server works (for example `python -m http.server 5173`). Opening `index.html` directly from the filesystem will not work because the app uses ES modules.
+There are no dependencies to install.
+
+`npm start` loads `.env` automatically if it exists (Node 22.5+). Without Supabase settings the server falls back to the local SQLite file.
+
+> Use `serve.js` for the order screen as well — every tablet and the chef screen need its API. Opening `index.html` directly from the filesystem will not work because the app uses ES modules. If tablets run separate servers, point them all at the same Supabase project so they share one order queue.
 
 For a stall:
 
-1. Open the site in Chrome.
+1. Open the order screen in Chrome on the tablet.
 2. Tap the fullscreen button in the top-right corner.
 3. Set the tablet to landscape and keep it on charge.
 4. Optionally enable Chrome kiosk mode / keep the screen awake in Android settings.
+5. Open <http://localhost:5173/chef> on a second screen or phone for the kitchen.
 
-## Local admin — no backend needed
+## Supabase
+
+Orders and analytics live in Supabase. To connect it:
+
+1. Create a project at <https://supabase.com>.
+2. Open **SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql), and run it.
+3. Copy `.env.example` to `.env` and set:
+   - `SUPABASE_URL` — Project Settings → Data API → Project URL.
+   - `SUPABASE_SECRET_KEY` — Project Settings → API Keys → **Secret keys** (starts with `sb_secret_`).
+   - On older projects, use the legacy `service_role` key as `SUPABASE_SERVICE_ROLE_KEY` instead.
+4. Run `npm start` and check that the server prints `Storage : Supabase` and `Supabase : connected`.
+
+The schema enables row-level security with no public policies. The **secret / service role key bypasses RLS**, so keep it only in the server's `.env` — never in the browser, the tablet app, or git. Tables are not readable with the publishable key.
+
+If `SUPABASE_URL` or the key is missing, the server quietly uses the local SQLite fallback (`data/orders.db`) so the stall can keep selling.
+
+### Local SQLite fallback
+
+- Data lives in `data/orders.db` (SQLite, WAL mode). The `data/` folder is git-ignored.
+- Back it up to keep the sales history; delete it to start fresh.
+- Order numbers restart from 1 on a fresh database. In Supabase, the `orders.id` identity column is used internally; the chef screen never shows it.
+
+## Kitchen queue
+
+The chef screen is deliberately minimal — it shows **only the drinks to prepare**, never order numbers, prices or customer details.
+
+- An order reaches the kitchen when the tablet opens its payment screen, so the staff can start preparing while the customer pays.
+- Each pending order line appears as a big row: `×2 Oreo Milkshake` with a **DONE** button.
+- Tapping **DONE** removes that drink from the queue and adds it to the "served today" counter.
+- The page refreshes itself every 3 seconds, so new orders pop up without a reload.
+
+The chef and analytics pages have no login. Keep them on the stall's local network and do not expose this server to the internet.
+
+## Analytics
+
+`/analytics` shows today's revenue, orders, drinks sold, pending drinks, average order value and discounts given, plus the top drinks today and a seven-day revenue chart. It refreshes every 10 seconds.
+
+## How orders behave
+
+- Orders are upserted by an unguessable client token: if the customer goes back and edits the order before the kitchen starts it, the same order is updated instead of duplicated.
+- Once a drink is marked done, later tablet edits cannot recreate it.
+- The tablet posts the order when the payment screen opens. There is no payment verification in this app — staff still confirm the UPI payment manually.
+
+## Local admin — per tablet
 
 Tap the **Settings** button (gear icon) in the top-right corner.
 
 - Default PIN: **`1234`** — change it in the admin panel after the first login.
-- Everything is stored in this tablet's browser `localStorage`. There is no server and no database.
+- Settings are stored in this tablet's browser `localStorage`. Orders, the kitchen queue and analytics are shared through Supabase (or the local SQLite fallback), but **menu prices, wheel offers, the spin sequence, UPI details and the PIN are per device**. Editing them on one tablet does not change another tablet.
 
 You can change:
 

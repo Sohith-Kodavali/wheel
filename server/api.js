@@ -1,0 +1,138 @@
+import { store } from './store.js';
+
+const MAX_BODY = 64 * 1024;
+
+function sendJson(res, status, data) {
+  const body = JSON.stringify(data);
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Length': Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    let size = 0;
+
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY) {
+        reject(new Error('Payload too large'));
+        req.destroy();
+        return;
+      }
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : null);
+      } catch {
+        reject(new Error('Invalid JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function validateOrder(body) {
+  if (!body || typeof body !== 'object') return { error: 'Send an order.' };
+
+  const token = typeof body.token === 'string' ? body.token.trim() : '';
+  if (!/^[a-zA-Z0-9-]{8,80}$/.test(token)) return { error: 'Invalid order token.' };
+
+  if (!Array.isArray(body.items) || body.items.length === 0) return { error: 'Add at least one item.' };
+  if (body.items.length > 20) return { error: 'Too many items.' };
+
+  const items = [];
+  let total = 0;
+
+  for (const raw of body.items) {
+    const id = typeof raw?.id === 'string' ? raw.id.trim().slice(0, 40) : '';
+    const name = typeof raw?.name === 'string' ? raw.name.trim().slice(0, 80) : '';
+    const qty = Math.trunc(Number(raw?.qty));
+    const price = Math.trunc(Number(raw?.price));
+
+    if (!id || !name) return { error: 'Invalid item.' };
+    if (!Number.isInteger(qty) || qty < 1 || qty > 20) return { error: 'Invalid item quantity.' };
+    if (!Number.isInteger(price) || price < 0 || price > 1_000_000) return { error: 'Invalid item price.' };
+
+    total += qty * price;
+    items.push({ id, name, qty, price });
+  }
+
+  const percent = Number(body.percent ?? 0);
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { error: 'Invalid discount.' };
+
+  const discount = Math.trunc(Number(body.discount ?? 0));
+  if (!Number.isInteger(discount) || discount < 0 || discount > total) return { error: 'Invalid discount.' };
+
+  return {
+    value: {
+      token,
+      items,
+      total,
+      discount,
+      final: total - discount,
+      percent,
+    },
+  };
+}
+
+export async function handleApi(req, res, url) {
+  const { pathname } = url;
+
+  try {
+    if (pathname === '/api/orders' && req.method === 'POST') {
+      const body = await readJson(req);
+      const parsed = validateOrder(body);
+      if (parsed.error) {
+        sendJson(res, 400, { error: parsed.error });
+        return;
+      }
+      const order = await store.createOrder(parsed.value);
+      sendJson(res, 200, { ok: true, number: order.number });
+      return;
+    }
+
+    if (pathname === '/api/chef/queue' && req.method === 'GET') {
+      sendJson(res, 200, {
+        items: await store.pendingItems(),
+        doneToday: await store.doneToday(),
+      });
+      return;
+    }
+
+    const doneMatch = pathname.match(/^\/api\/chef\/items\/(\d+)\/done$/);
+    if (doneMatch && req.method === 'POST') {
+      const ok = await store.markItemDone(Number(doneMatch[1]));
+      if (!ok) {
+        sendJson(res, 404, { error: 'Item not found or already done.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true, doneToday: await store.doneToday() });
+      return;
+    }
+
+    if (pathname === '/api/analytics' && req.method === 'GET') {
+      sendJson(res, 200, await store.analytics());
+      return;
+    }
+
+    sendJson(res, 404, { error: 'Not found' });
+  } catch (error) {
+    if (error.message === 'Invalid JSON') {
+      if (!res.headersSent) sendJson(res, 400, { error: 'Invalid JSON body.' });
+      return;
+    }
+    if (error.message === 'Payload too large') {
+      if (!res.headersSent) sendJson(res, 413, { error: 'Order payload is too large.' });
+      return;
+    }
+    console.error('API error:', error.message);
+    if (!res.headersSent) sendJson(res, 500, { error: 'Server error' });
+    else res.end();
+  }
+}

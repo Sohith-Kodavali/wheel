@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Analytics — The Milkshake Factory</title>
+    <meta name="theme-color" content="#fff7ec" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./css/kitchen.css" />
+  </head>
+  <body class="is-analytics">
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark">MF</span>
+        <div>
+          <span class="kicker">The Milkshake Factory</span>
+          <h1>Sales today</h1>
+        </div>
+      </div>
+      <div class="top-side">
+        <a class="quiet-link" href="/chef">← Kitchen queue</a>
+      </div>
+    </header>
+
+    <main class="main">
+      <p class="notice" id="analytics-error" role="status"></p>
+      <section class="stats" id="stats" aria-label="Today's numbers"></section>
+
+      <div class="panels">
+        <section class="panel">
+          <h2>Top drinks today</h2>
+          <ul class="top-list" id="top-list"></ul>
+          <p class="muted" id="top-empty" hidden>No drinks sold yet today.</p>
+        </section>
+
+        <section class="panel">
+          <h2>Last 7 days</h2>
+          <div class="week" id="week-chart" aria-label="Revenue for the last seven days"></div>
+        </section>
+      </div>
+
+      <p class="all-time" id="all-time"></p>
+    </main>
+
+    <script type="module" src="./js/analytics.js"></script>
+  </body>
+</html>
