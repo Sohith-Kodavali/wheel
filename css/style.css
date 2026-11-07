@@ -695,6 +695,71 @@ a.icon-btn {
   animation: card-bump 0.32s ease;
 }
 
+.drink-card.is-special {
+  border-color: #f3c25b;
+  box-shadow: 0 26px 46px -32px rgba(190, 120, 0, 0.55);
+}
+
+.drink-card.is-out {
+  opacity: 0.8;
+}
+
+.drink-card.is-out:hover {
+  transform: none;
+  box-shadow: 0 22px 44px -34px rgba(60, 30, 45, 0.5);
+}
+
+.card-special {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe08a, #f5a623);
+  color: #5a3500;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 16px -8px rgba(150, 85, 0, 0.8);
+}
+
+.card-out {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.card-out span {
+  padding: 7px 14px;
+  border: 1.5px solid #e9ded3;
+  border-radius: 999px;
+  background: #fffdf8;
+  color: #7c6a6f;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sold-out-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f1e8dd;
+  color: #7c6a6f;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .card-media {
   position: relative;
   flex: 1;
@@ -743,6 +808,10 @@ a.icon-btn {
 
 .tint-caramel {
   background: radial-gradient(circle at 50% 30%, #fbefdf, #f3ddc2);
+}
+
+.tint-orange {
+  background: radial-gradient(circle at 50% 30%, #fff1d9, #ffd9a8);
 }
 
 .card-flavor {
@@ -3031,6 +3100,36 @@ a.icon-btn {
   padding: 8px 10px;
   text-align: right;
   min-height: 38px;
+}
+
+.admin-menu-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-menu-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.admin-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-flag input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--pink);
 }
 
 .admin-offer-head,

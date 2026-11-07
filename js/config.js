@@ -31,23 +31,23 @@ export const DEFAULT_MENU = [
   },
   {
     id: 'cuban',
-    name: 'Cuban Mint Mojito',
-    flavour: 'Cuban Mint',
+    name: 'Orange Mojito',
+    flavour: 'Orange',
     category: 'Mojito',
     price: 3900,
-    tint: 'mint',
-    art: 'mojito-mint',
-    desc: 'Mint, lime and crushed ice.',
+    tint: 'orange',
+    art: 'mojito-orange',
+    desc: 'Orange, lime and crushed ice.',
   },
   {
     id: 'lime',
-    name: 'Lime Mojito',
-    flavour: 'Lime',
+    name: 'Sweet Lime Mojito',
+    flavour: 'Sweet Lime',
     category: 'Mojito',
     price: 3900,
     tint: 'mint',
     art: 'mojito-lime',
-    desc: 'Sharp citrus fizz over ice.',
+    desc: 'Sweet citrus fizz over ice.',
   },
   {
     id: 'blue',
@@ -82,7 +82,7 @@ export const DEFAULT_WHEEL = [
   { id: 'off-5', label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
 ];
 
-export const SPIN_MIN_TOTAL = 10000;
+export const SPIN_MIN_ITEMS = 3;
 export const SETTINGS_KEY = 'msf-tablet-settings-v1';
 export const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
 
@@ -158,9 +158,14 @@ export function normalizeSettings(raw) {
   if (raw.version === DEFAULT_SETTINGS.version && raw.menu && typeof raw.menu === 'object') {
     for (const item of DEFAULT_MENU) {
       const override = raw.menu[item.id];
-      if (override && Number.isInteger(override.price) && override.price > 0 && override.price <= 1_000_000) {
-        base.menu[item.id] = { price: override.price };
+      if (!override || typeof override !== 'object') continue;
+      const entry = {};
+      if (Number.isInteger(override.price) && override.price > 0 && override.price <= 1_000_000) {
+        entry.price = override.price;
       }
+      if (override.outOfStock === true) entry.outOfStock = true;
+      if (override.special === true) entry.special = true;
+      if (Object.keys(entry).length) base.menu[item.id] = entry;
     }
   }
 

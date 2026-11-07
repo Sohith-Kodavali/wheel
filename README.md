@@ -3,7 +3,7 @@
 A deliberately small kiosk for the stall tablet. Three screens only:
 
 1. **Menu** — tap drinks to add them.
-2. **Total + Spin & Win** — review the order; on ₹100+ orders spin the rigged wheel for a discount or pay without spinning. Under ₹100 it goes straight to payment.
+2. **Total + Spin & Win** — review the order; on orders with 3 or more drinks spin the rigged wheel for a discount or pay without spinning. With 2 or fewer drinks it goes straight to payment.
 3. **Pay** — a UPI QR for the exact amount.
 
 No admin panel for customers, and the tablet UI stays plain HTML, CSS and JavaScript. Orders, the kitchen queue, sales numbers and the shared menu/settings live in a small backend (Supabase, with a local SQLite fallback), and the QR is generated in the browser from the configured UPI ID and the exact payable amount.
@@ -108,6 +108,7 @@ You can change:
 - **The UPI QR photo** — upload a PNG/JPG/WebP of the stall's scanner. It is resized in the browser and stored as a data URL in the shared settings.
 - **QR mode on the payment screen** — use the uploaded stall QR, or the generated QR that already contains the exact amount.
 - **Menu prices** — one price for every drink.
+- **Out of stock / Special** — tick these per drink in the menu list. Out-of-stock drinks show a blocked card and cannot be added; special drinks get a badge on the order screen.
 - **Wheel offers** — add, edit or remove the slices on the wheel (label, discount, wheel share and colour).
 - **Spin sequence** — a separate ordered list of offers that decides what each spin lands on, plus the max-discount / minimum-payable limits.
 
@@ -124,7 +125,7 @@ The shared settings override the fallbacks in `js/config.js`. The default menu, 
 
 - **Rigging:** the wheel does not use random probabilities. Each spin takes the next offer from the saved sequence and stops on that slice. Every spin wins. Both the offers and the sequence are edited from the settings page.
 - **Wheel area:** each offer has a **Wheel %** that sets its slice size. The settings page shows the running total and scales the slices to fill the wheel when you save.
-- **Spin minimum:** the wheel unlocks at ₹100. Below that the bottom bar shows how much more is needed, and the total screen goes straight to payment.
+- **Spin minimum:** the wheel unlocks at 3 drinks. With fewer, the bottom bar shows how many more are needed, and the total screen goes straight to payment.
 - **Discount:** taken from the order total, then capped by the max discount and minimum payable settings.
 - **Prices and menu:** every item has a single `price` in paise (`7500` = ₹75). The settings page edits the live prices; the defaults are in `DEFAULT_MENU`.
 
@@ -133,11 +134,11 @@ The shared settings override the fallbacks in `js/config.js`. The default menu, 
 | Drink | Price |
 |---|---:|
 | Milkshakes (Oreo / KitKat / Dark Fantasy) | ₹75 |
-| Mojitos (Cuban Mint / Lime / Blue) | ₹39 |
+| Mojitos (Orange / Sweet Lime / Blue) | ₹39 |
 | Cold Coffee | ₹65 |
 
-- **Under ₹100** → no wheel; the total screen continues straight to payment.
-- **₹100 or more** → the customer can spin for a discount on the order total, or pay without spinning.
+- **Fewer than 3 drinks** → no wheel; the total screen continues straight to payment.
+- **3 or more drinks** → the customer can spin for a discount on the order total, or pay without spinning.
 
 The menu cards, bottom bar, summary and payment screen show that single price.
 
@@ -155,7 +156,7 @@ A win triggers the weighted wheel, confetti, a radial spark/coin blast, a gold f
 - The menu is split into three sections — **Milkshakes**, **Mojitos** and **Cold Coffee** — with a live total bar and a **Clear** button. It is locked to the tablet screen and does not scroll between sections.
 - Every card shows the drink's single price.
 - Tapping a drink (or its Add button) adds one. The stepper changes quantities. Max 20 per drink.
-- **Review order** opens the total screen. On ₹100+ orders it shows a **Spin & Win** button and a **Pay ₹X without spinning** link. Under ₹100 it shows how much more unlocks the spin and a **Continue to payment** button instead.
+- **Review order** opens the total screen. On orders with 3+ drinks it shows a **Spin & Win** button and a **Pay ₹X without spinning** link. With fewer it shows how many more drinks unlock the spin and a **Continue to payment** button instead.
 - The wheel overlay is a weighted canvas wheel with real deceleration, tick sounds, mute, confetti, a spark/coin blast, a flash, screen shake, haptics, and a result panel.
 - The result is locked for the order. Changing the order clears it and returns to the full order total.
 - After spinning, **Pay ₹X** goes straight to the QR. The QR encodes the exact discounted amount, and the payment screen lists order total → discount → final.

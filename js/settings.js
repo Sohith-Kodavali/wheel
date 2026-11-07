@@ -34,7 +34,12 @@ function showToast(message) {
 function menuItems() {
   return DEFAULT_MENU.map((item) => {
     const override = SETTINGS.menu[item.id];
-    return override ? { ...item, price: override.price } : { ...item };
+    return {
+      ...item,
+      price: override?.price ?? item.price,
+      outOfStock: override?.outOfStock === true,
+      special: override?.special === true,
+    };
   });
 }
 
@@ -66,7 +71,19 @@ function renderAdminMenuRows() {
     .map(
       (item) => `
     <div class="admin-menu-row" data-menu-id="${item.id}">
-      <span class="admin-drink">${escapeHtml(item.name)}<small>${escapeHtml(item.flavour)}</small></span>
+      <div class="admin-menu-main">
+        <span class="admin-drink">${escapeHtml(item.name)}<small>${escapeHtml(item.flavour)}</small></span>
+        <div class="admin-menu-flags">
+          <label class="admin-flag">
+            <input type="checkbox" data-flag="outOfStock"${item.outOfStock ? ' checked' : ''} />
+            Out of stock
+          </label>
+          <label class="admin-flag">
+            <input type="checkbox" data-flag="special"${item.special ? ' checked' : ''} />
+            Special
+          </label>
+        </div>
+      </div>
       <input
         class="admin-input"
         type="number"
@@ -318,7 +335,11 @@ function buildSettings() {
     if (!Number.isFinite(price) || price <= 0 || price > 1_000_000) {
       return { error: `${item.name}: enter a valid price.` };
     }
-    menu[id] = { price };
+    menu[id] = {
+      price,
+      outOfStock: row.querySelector('[data-flag="outOfStock"]').checked,
+      special: row.querySelector('[data-flag="special"]').checked,
+    };
   }
 
   return {

@@ -132,11 +132,16 @@ function validateSettings(body) {
   const menu = {};
   for (const id of menuKeys) {
     if (!/^[a-zA-Z0-9-]{1,40}$/.test(id)) return { error: 'Invalid menu item.' };
-    const price = Math.trunc(Number(settings.menu[id]?.price));
+    const entry = settings.menu[id];
+    const price = Math.trunc(Number(entry?.price));
     if (!Number.isInteger(price) || price <= 0 || price > 1_000_000) {
       return { error: 'Invalid menu price.' };
     }
-    menu[id] = { price };
+    menu[id] = {
+      price,
+      outOfStock: entry?.outOfStock === true,
+      special: entry?.special === true,
+    };
   }
 
   if (!Array.isArray(settings.wheel?.segments)) return { error: 'Invalid wheel.' };
