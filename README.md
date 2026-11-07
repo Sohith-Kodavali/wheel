@@ -24,7 +24,7 @@ There are no dependencies to install.
 
 `npm start` loads `.env` automatically if it exists (Node 22.5+). Without Supabase settings the server falls back to the local SQLite file.
 
-> Use `serve.js` for every screen. Menu prices, UPI details, the wheel and the admin PIN are stored once in Supabase, so changing them from the settings page updates every device within about five seconds. Orders, the kitchen queue and analytics are shared the same way.
+> Use `serve.js` for every screen. Menu prices, UPI details and the wheel are stored once in Supabase, so changing them from the settings page updates every device within about five seconds. Orders, the kitchen queue and analytics are shared the same way.
 
 For a stall:
 
@@ -42,8 +42,6 @@ Vercel serves the pages statically and runs the API through `api/index.js`; `ver
 2. Add these Environment Variables for Production and Preview:
    - `SUPABASE_URL`
    - `SUPABASE_SECRET_KEY`
-   - `ADMIN_SESSION_SECRET` — any long random string (signs the admin cookie)
-   - `COOKIE_SECURE=1`
 3. Deploy.
 
 Every `/api/*` request goes to the same serverless function, so orders, the chef queue, analytics and settings work exactly like the local server. Vercel's filesystem is read-only and stateless, so the SQLite fallback is not used there — Supabase is required.
@@ -64,7 +62,7 @@ Orders, analytics and the shared settings live in Supabase. To connect it:
 
 The schema creates `orders`, `order_items` and `app_settings`, and enables row-level security with no public policies. The **secret / service role key bypasses RLS**, so keep it only in the server's `.env` — never in the browser, the tablet app, or git. Tables are not readable with the publishable key.
 
-The admin PIN is stored server-side as a salted scrypt hash; only `/settings` asks for it, and the server sets an HttpOnly session cookie after sign-in.
+The `/settings` page has no password; anyone who can reach the URL can change the shared config. Keep it on the stall's network, or put the deployment behind access control if it is public.
 
 If `SUPABASE_URL` or the key is missing, the server quietly uses the local SQLite fallback (`data/orders.db`) so the stall can keep selling.
 
@@ -82,12 +80,13 @@ The chef screen is deliberately minimal — it shows **only the drinks to prepar
 - Each pending order line appears as a big row: `×2 Oreo Milkshake` with a **DONE** button.
 - Tapping **DONE** removes that drink from the queue and adds it to the "served today" counter.
 - The page refreshes itself every 3 seconds, so new orders pop up without a reload.
+- A chime plays when new tickets arrive. Tap **Enable sound** once (browsers block audio until a tap); afterwards it can be toggled with the same button.
 
 The chef and analytics pages have no login. Keep them on the stall's local network and do not expose this server to the internet.
 
 ## Analytics
 
-`/analytics` shows today's revenue, orders, drinks sold, pending drinks, average order value and discounts given, plus the top drinks today and a seven-day revenue chart. It refreshes every 10 seconds.
+`/analytics` shows today's revenue, orders, drinks sold, pending drinks, average order value and discounts given, plus the top drinks today and a seven-day revenue chart. It also lists every order with its items and total; use **Remove** on a cancelled order to delete it and its items. It refreshes every 10 seconds.
 
 ## How orders behave
 
@@ -99,10 +98,9 @@ The chef and analytics pages have no login. Keep them on the stall's local netwo
 
 Open <http://localhost:5173/settings> on the admin phone or any device.
 
-- Default PIN: **`1234`** — change it under **Admin PIN** after the first sign-in.
-- The PIN is checked on the server and stored as a salted scrypt hash. A successful sign-in sets an HttpOnly session cookie for 12 hours.
+- There is no sign-in; anyone with the URL can change the settings.
 - Saving pushes the configuration to Supabase. Every order screen polls every five seconds and re-renders, so a price or wheel change reaches all devices without a reload.
-- **Log out** clears the session. The settings page never shows orders or customer details.
+- The settings page never shows orders or customer details.
 
 You can change:
 
@@ -112,15 +110,13 @@ You can change:
 - **Menu prices** — one price for every drink.
 - **Wheel offers** — add, edit or remove the slices on the wheel (label, discount, wheel share and colour).
 - **Spin sequence** — a separate ordered list of offers that decides what each spin lands on, plus the max-discount / minimum-payable limits.
-- **Admin PIN** (4–8 digits).
 
 ### The QR photo, explained
 
 A photo of a normal stall QR does **not** contain the order amount. If you choose the uploaded photo, the pay screen shows the amount and tells the customer to enter it in their UPI app. The **generated QR** encodes the UPI ID and the exact amount, so the customer does not have to type it.
 
 - The photo is part of the shared settings and is served to every device.
-- The PIN only gates the settings page; it is not encryption.
-- If the PIN is forgotten while a settings row exists, clear `pin_hash` and `pin_salt` in the `app_settings` table — the default `1234` works again.
+- The settings page has no password; it is not encryption.
 
 ## Defaults in code
 

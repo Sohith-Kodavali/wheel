@@ -786,7 +786,8 @@ function openWheel() {
   requestAnimationFrame(() => {
     wheel.redraw();
     if (state.spin) {
-      wheel.snapToIndex(state.spin.index);
+      const index = SEGMENTS.findIndex((segment) => segment.id === state.spin.id);
+      if (index >= 0) wheel.snapToIndex(index);
       showResult(state.spin, { restore: true });
     } else {
       resetWheelUI();
@@ -802,12 +803,12 @@ function closeWheel() {
 }
 
 function pickRiggedResult() {
-  if (!RIGGED_SEQUENCE.length || !SEGMENTS.length) return { percent: 0, index: 0 };
+  if (!RIGGED_SEQUENCE.length || !SEGMENTS.length) return { percent: 0, index: 0, id: '' };
   const offerId = RIGGED_SEQUENCE[state.sequenceIndex % RIGGED_SEQUENCE.length];
   state.sequenceIndex += 1;
   let index = SEGMENTS.findIndex((segment) => segment.id === offerId);
   if (index < 0) index = 0;
-  return { percent: SEGMENTS[index].percent, index };
+  return { percent: SEGMENTS[index].percent, index, id: SEGMENTS[index].id };
 }
 
 function showResult(spin, { restore = false } = {}) {
@@ -871,6 +872,7 @@ async function doSpin() {
     state.spin = {
       percent: rigged.percent,
       index: rigged.index,
+      id: rigged.id,
       total,
       discount,
       final,

@@ -1,13 +1,17 @@
-html,
-body {
-  height: auto;
-  min-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+html {
+  height: 100%;
+  overflow: hidden;
 }
 
 body.settings-body {
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
   display: block;
   user-select: auto;
   -webkit-user-select: auto;

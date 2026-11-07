@@ -49,32 +49,7 @@
           </div>
         </header>
 
-        <div class="admin-lock" id="admin-lock">
-          <span class="admin-lock-icon">
-            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M7 10V7a5 5 0 0 1 10 0v3" />
-              <rect x="4" y="10" width="16" height="11" rx="2.5" />
-            </svg>
-          </span>
-          <h3>Staff sign in</h3>
-          <p>Enter the admin PIN. The default is 1234.</p>
-          <form class="admin-pin-form" id="pin-form">
-            <input
-              class="admin-input admin-pin"
-              id="pin-input"
-              type="password"
-              inputmode="numeric"
-              maxlength="8"
-              autocomplete="current-password"
-              aria-label="Admin PIN"
-              placeholder="Admin PIN"
-            />
-            <button class="btn btn-primary" type="submit">Unlock</button>
-          </form>
-          <p class="admin-error" id="pin-error" role="alert"></p>
-        </div>
-
-        <div id="admin-content" hidden>
+        <div id="admin-content">
           <form id="admin-form">
             <section class="admin-section">
               <h3>Payment</h3>
@@ -160,29 +135,11 @@
               </div>
             </section>
 
-            <section class="admin-section">
-              <h3>Admin PIN</h3>
-              <label class="admin-field">
-                New PIN (4–8 digits)
-                <input
-                  class="admin-input"
-                  id="admin-new-pin"
-                  type="password"
-                  inputmode="numeric"
-                  maxlength="8"
-                  autocomplete="new-password"
-                  placeholder="Leave blank to keep the current PIN"
-                />
-              </label>
-              <p class="admin-hint">The PIN is checked on the server and is not shared with customer devices.</p>
-            </section>
-
             <div class="admin-footer">
               <p class="admin-error" id="admin-error" role="alert"></p>
               <div class="admin-actions">
                 <button class="btn btn-text" type="button" id="admin-reset">Reset defaults</button>
                 <div class="admin-actions-right">
-                  <button class="btn btn-ghost" type="button" id="admin-logout">Log out</button>
                   <button class="btn btn-primary" type="submit">Save settings</button>
                 </div>
               </div>

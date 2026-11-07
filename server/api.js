@@ -1,16 +1,9 @@
-import crypto from 'node:crypto';
 import { store } from './store.js';
 
 const MAX_BODY = 64 * 1024;
 const MAX_SETTINGS_BODY = 2 * 1024 * 1024;
 const SETTINGS_VERSION = 3;
 const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
-const COOKIE_NAME = 'msf_admin';
-const SESSION_TTL = 12 * 60 * 60 * 1000;
-const SESSION_SECRET =
-  process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_SECRET_KEY || 'milkshake-dev-session';
-
-const loginAttempts = new Map();
 
 function sendJson(res, status, data) {
   const body = JSON.stringify(data);
@@ -66,87 +59,6 @@ function readJson(req, limit = MAX_BODY) {
   });
 }
 
-function parseCookies(req) {
-  const result = {};
-  const header = req.headers.cookie || '';
-  for (const part of header.split(';')) {
-    const index = part.indexOf('=');
-    if (index === -1) continue;
-    const key = part.slice(0, index).trim();
-    if (!key) continue;
-    const value = part.slice(index + 1).trim();
-    try {
-      result[key] = decodeURIComponent(value);
-    } catch {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-function signExpiry(expires) {
-  return crypto.createHmac('sha256', SESSION_SECRET).update(String(expires)).digest('hex');
-}
-
-function sessionToken() {
-  const expires = Date.now() + SESSION_TTL;
-  return `${expires}.${signExpiry(expires)}`;
-}
-
-function validSession(token) {
-  if (!token) return false;
-  const parts = token.split('.');
-  if (parts.length !== 2) return false;
-  const expires = Number(parts[0]);
-  if (!Number.isFinite(expires) || expires < Date.now()) return false;
-  const expected = Buffer.from(signExpiry(expires), 'hex');
-  const actual = Buffer.from(parts[1], 'hex');
-  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
-}
-
-function isAuthed(req) {
-  return validSession(parseCookies(req)[COOKIE_NAME]);
-}
-
-function cookieHeader(req, value, maxAge) {
-  const secure =
-    process.env.COOKIE_SECURE === '1' || String(req.headers['x-forwarded-proto'] || '') === 'https';
-  const parts = [`${COOKIE_NAME}=${value}`, 'HttpOnly', 'SameSite=Strict', 'Path=/', `Max-Age=${maxAge}`];
-  if (secure) parts.push('Secure');
-  return parts.join('; ');
-}
-
-function setSession(req, res, token) {
-  res.setHeader('Set-Cookie', cookieHeader(req, token, SESSION_TTL / 1000));
-}
-
-function clearSession(req, res) {
-  res.setHeader('Set-Cookie', cookieHeader(req, '', 0));
-}
-
-function hashPin(pin) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  return { hash: crypto.scryptSync(pin, salt, 32).toString('hex'), salt };
-}
-
-function pinMatches(pin, record) {
-  if (!record?.hash || !record?.salt) return pin === '1234';
-  const candidate = crypto.scryptSync(pin, record.salt, 32);
-  const expected = Buffer.from(record.hash, 'hex');
-  return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected);
-}
-
-function loginAllowed(ip) {
-  const now = Date.now();
-  const entry = loginAttempts.get(ip);
-  if (!entry || now > entry.reset) {
-    loginAttempts.set(ip, { count: 1, reset: now + 10 * 60 * 1000 });
-    return true;
-  }
-  entry.count += 1;
-  return entry.count <= 10;
-}
-
 function validateOrder(body) {
   if (!body || typeof body !== 'object') return { error: 'Send an order.' };
 
@@ -197,14 +109,6 @@ function validateSettings(body) {
   const settings = body.settings;
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
     return { error: 'Invalid settings.' };
-  }
-
-  let pin = null;
-  if (body.pin !== undefined && body.pin !== '') {
-    if (typeof body.pin !== 'string' || !/^\d{4,8}$/.test(body.pin)) {
-      return { error: 'The admin PIN must be 4–8 digits.' };
-    }
-    pin = body.pin;
   }
 
   const upiId = typeof settings.upi?.id === 'string' ? settings.upi.id.trim() : '';
@@ -281,7 +185,6 @@ function validateSettings(body) {
         wheel: { segments },
         spin: { sequence, maxDiscount, minPayable },
       },
-      pin,
     },
   };
 }
@@ -290,6 +193,11 @@ export async function handleApi(req, res, url) {
   const { pathname } = url;
 
   try {
+    if (pathname === '/api/orders' && req.method === 'GET') {
+      sendJson(res, 200, { orders: await store.listOrders() });
+      return;
+    }
+
     if (pathname === '/api/orders' && req.method === 'POST') {
       const body = await readJson(req);
       const parsed = validateOrder(body);
@@ -302,62 +210,31 @@ export async function handleApi(req, res, url) {
       return;
     }
 
+    const orderMatch = pathname.match(/^\/api\/orders\/(\d+)$/);
+    if (orderMatch && req.method === 'DELETE') {
+      const deleted = await store.deleteOrder(Number(orderMatch[1]));
+      if (!deleted) {
+        sendJson(res, 404, { error: 'Order not found.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
     if (pathname === '/api/settings' && req.method === 'GET') {
       sendJson(res, 200, { settings: await store.getSettings() });
       return;
     }
 
     if (pathname === '/api/settings' && req.method === 'PUT') {
-      if (!isAuthed(req)) {
-        sendJson(res, 401, { error: 'Sign in to change settings.' });
-        return;
-      }
       const body = await readJson(req, MAX_SETTINGS_BODY);
       const parsed = validateSettings(body);
       if (parsed.error) {
         sendJson(res, 400, { error: parsed.error });
         return;
       }
-      const pinRecord = parsed.value.pin ? hashPin(parsed.value.pin) : null;
-      await store.saveSettings(parsed.value.settings, pinRecord);
+      await store.saveSettings(parsed.value.settings);
       sendJson(res, 200, { ok: true, settings: parsed.value.settings });
-      return;
-    }
-
-    if (pathname === '/api/admin/login' && req.method === 'POST') {
-      const forwarded = String(req.headers['x-forwarded-for'] || '')
-        .split(',')[0]
-        .trim();
-      const ip = forwarded || req.socket?.remoteAddress || 'unknown';
-      if (!loginAllowed(ip)) {
-        sendJson(res, 429, { error: 'Too many attempts. Wait a few minutes.' });
-        return;
-      }
-      const body = await readJson(req, 8 * 1024);
-      const pin = typeof body?.pin === 'string' ? body.pin.trim() : '';
-      if (!/^\d{4,8}$/.test(pin)) {
-        sendJson(res, 400, { error: 'Enter your 4–8 digit PIN.' });
-        return;
-      }
-      const record = await store.getPinRecord();
-      if (!pinMatches(pin, record)) {
-        sendJson(res, 401, { error: 'Wrong PIN.' });
-        return;
-      }
-      loginAttempts.delete(ip);
-      setSession(req, res, sessionToken());
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    if (pathname === '/api/admin/logout' && req.method === 'POST') {
-      clearSession(req, res);
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    if (pathname === '/api/admin/session' && req.method === 'GET') {
-      sendJson(res, 200, { authed: isAuthed(req) });
       return;
     }
 

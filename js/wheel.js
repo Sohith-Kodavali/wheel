@@ -107,20 +107,27 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
   }
   ctx.restore();
 
+  const hub = size * (compact ? 0.14 : 0.13);
+  const labelRadius = (hub + segRadius) / 2;
+
   arcs.forEach((arc, index) => {
     const segment = segments[index];
+    const flip = Math.cos(arc.mid) < 0;
     ctx.save();
     ctx.translate(c, c);
-    ctx.rotate(arc.mid);
-    ctx.textAlign = 'right';
+    ctx.rotate(flip ? arc.mid + Math.PI : arc.mid);
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(30, 10, 20, 0.25)';
     ctx.shadowBlur = 3;
     ctx.shadowOffsetY = 1;
     ctx.fillStyle = textColorFor(segment.color);
     ctx.font = `800 ${fontBase}px "Baloo 2", "Nunito", system-ui, sans-serif`;
-    const pad = compact ? 12 : 34;
-    ctx.fillText(truncateLabel(segment.label, compact ? 9 : 15), segRadius - pad, 0);
+    ctx.fillText(
+      truncateLabel(segment.label, compact ? 9 : 15),
+      flip ? -labelRadius : labelRadius,
+      0,
+    );
     ctx.restore();
   });
 
@@ -149,7 +156,6 @@ export function drawWheel(canvas, segments, { compact = false } = {}) {
   ctx.strokeStyle = 'rgba(232, 188, 102, 0.8)';
   ctx.stroke();
 
-  const hub = size * (compact ? 0.14 : 0.13);
   ctx.beginPath();
   ctx.arc(c, c, hub, 0, TAU);
   ctx.fillStyle = '#FFF6EA';

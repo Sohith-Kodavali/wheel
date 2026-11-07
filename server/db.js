@@ -136,6 +136,53 @@ export function markItemDone(id) {
   return result.changes > 0;
 }
 
+export function listOrders() {
+  const orders = db
+    .prepare(
+      `SELECT id, number, total, discount, final_total, percent, created_at
+       FROM orders
+       ORDER BY created_at DESC, id DESC`,
+    )
+    .all();
+
+  const items = db
+    .prepare(
+      `SELECT order_id, id, name, qty, unit_price, done
+       FROM order_items
+       ORDER BY id ASC`,
+    )
+    .all();
+
+  const byOrder = new Map();
+  for (const item of items) {
+    const list = byOrder.get(item.order_id) || [];
+    list.push({
+      id: item.id,
+      name: item.name,
+      qty: item.qty,
+      price: item.unit_price,
+      done: Boolean(item.done),
+    });
+    byOrder.set(item.order_id, list);
+  }
+
+  return orders.map((order) => ({
+    id: order.id,
+    number: order.number,
+    createdAt: order.created_at,
+    total: order.total,
+    discount: order.discount,
+    final: order.final_total,
+    percent: order.percent,
+    items: byOrder.get(order.id) || [],
+  }));
+}
+
+export function deleteOrder(id) {
+  const result = db.prepare('DELETE FROM orders WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
 function localDay(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -153,23 +200,15 @@ export function getSettings() {
   }
 }
 
-export function getPinRecord() {
-  const row = db.prepare('SELECT pin_hash, pin_salt FROM app_settings WHERE id = 1').get();
-  if (!row?.pin_hash || !row?.pin_salt) return null;
-  return { hash: row.pin_hash, salt: row.pin_salt };
-}
-
-export function saveSettings(settings, pin) {
+export function saveSettings(settings) {
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO app_settings (id, data, pin_hash, pin_salt, updated_at)
-     VALUES (1, ?, ?, ?, ?)
+    `INSERT INTO app_settings (id, data, updated_at)
+     VALUES (1, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        data = excluded.data,
-       pin_hash = COALESCE(excluded.pin_hash, app_settings.pin_hash),
-       pin_salt = COALESCE(excluded.pin_salt, app_settings.pin_salt),
        updated_at = excluded.updated_at`,
-  ).run(JSON.stringify(settings), pin?.hash ?? null, pin?.salt ?? null, now);
+  ).run(JSON.stringify(settings), now);
 }
 
 export function analytics() {

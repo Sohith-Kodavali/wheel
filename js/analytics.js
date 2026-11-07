@@ -4,6 +4,9 @@ const topEmpty = document.getElementById('top-empty');
 const weekEl = document.getElementById('week-chart');
 const allTimeEl = document.getElementById('all-time');
 const errorEl = document.getElementById('analytics-error');
+const orderListEl = document.getElementById('order-list');
+const ordersCountEl = document.getElementById('orders-count');
+const ordersEmptyEl = document.getElementById('orders-empty');
 
 function money(paise) {
   const rupees = Number(paise) / 100;
@@ -111,12 +114,93 @@ function paint(data) {
   allTimeEl.textContent = `All time: ${data.allTime.orders} orders · ${money(data.allTime.revenue)}`;
 }
 
+function orderTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const time = date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  const sameDay = date.toDateString() === new Date().toDateString();
+  if (sameDay) return time;
+  return `${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+function orderRow(order) {
+  const row = document.createElement('article');
+  row.className = 'order-row';
+
+  const head = document.createElement('div');
+  head.className = 'order-head';
+
+  const number = document.createElement('strong');
+  number.className = 'order-number';
+  number.textContent = `#${order.number}`;
+
+  const time = document.createElement('span');
+  time.className = 'order-time';
+  time.textContent = orderTime(order.createdAt);
+
+  head.append(number, time);
+
+  const items = document.createElement('p');
+  items.className = 'order-items';
+  items.textContent = order.items.map((item) => `${item.qty}× ${item.name}`).join(' · ') || '—';
+
+  const foot = document.createElement('div');
+  foot.className = 'order-foot';
+
+  const amount = document.createElement('span');
+  amount.className = 'order-money';
+  amount.textContent = money(order.final);
+  if (order.discount > 0) {
+    const was = document.createElement('s');
+    was.textContent = money(order.total);
+    amount.append(' ', was);
+  }
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'order-remove';
+  remove.textContent = 'Remove';
+  remove.setAttribute('aria-label', `Remove order ${order.number}`);
+  remove.addEventListener('click', () => removeOrder(order, remove));
+
+  foot.append(amount, remove);
+  row.append(head, items, foot);
+  return row;
+}
+
+function paintOrders(orders) {
+  orderListEl.replaceChildren(...orders.map(orderRow));
+  ordersEmptyEl.hidden = orders.length > 0;
+  ordersCountEl.textContent = orders.length === 1 ? '1 order' : `${orders.length} orders`;
+}
+
+async function removeOrder(order, button) {
+  if (!window.confirm(`Remove order #${order.number}? Only use this for cancelled orders.`)) return;
+
+  button.disabled = true;
+  button.textContent = 'Removing…';
+  try {
+    const res = await fetch(`/api/orders/${order.id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await load();
+  } catch {
+    button.disabled = false;
+    button.textContent = 'Remove';
+    errorEl.textContent = 'Could not remove that order — try again.';
+  }
+}
+
 async function load() {
   try {
-    const res = await fetch('/api/analytics', { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const [analyticsRes, ordersRes] = await Promise.all([
+      fetch('/api/analytics', { cache: 'no-store' }),
+      fetch('/api/orders', { cache: 'no-store' }),
+    ]);
+    if (!analyticsRes.ok || !ordersRes.ok) throw new Error('HTTP error');
+    const [analytics, orders] = await Promise.all([analyticsRes.json(), ordersRes.json()]);
     errorEl.textContent = '';
-    paint(await res.json());
+    paint(analytics);
+    paintOrders(orders.orders || []);
   } catch {
     errorEl.textContent = 'Could not load analytics — retrying…';
   }

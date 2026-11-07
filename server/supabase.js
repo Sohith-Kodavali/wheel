@@ -155,6 +155,37 @@ export async function markItemDone(id) {
   return Array.isArray(data) && data.length > 0;
 }
 
+export async function listOrders() {
+  const { data } = await rest(
+    `${ORDERS}?select=id,created_at,total,discount,final_total,percent,order_items(id,name,qty,unit_price,done)&order=created_at.desc,id.desc`,
+  );
+
+  return (data || []).map((order) => ({
+    id: order.id,
+    number: order.id,
+    createdAt: order.created_at,
+    total: order.total,
+    discount: order.discount,
+    final: order.final_total,
+    percent: Number(order.percent),
+    items: (order.order_items || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      qty: item.qty,
+      price: item.unit_price,
+      done: item.done,
+    })),
+  }));
+}
+
+export async function deleteOrder(id) {
+  const { data } = await rest(`${ORDERS}?id=eq.${Number(id)}`, {
+    method: 'DELETE',
+    prefer: 'return=representation',
+  });
+  return Array.isArray(data) && data.length > 0;
+}
+
 function localDay(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -256,22 +287,10 @@ export async function getSettings() {
   return data?.[0]?.data || {};
 }
 
-export async function getPinRecord() {
-  const { data } = await rest(`${SETTINGS}?id=eq.1&select=pin_hash,pin_salt`);
-  const row = data?.[0];
-  if (!row?.pin_hash || !row?.pin_salt) return null;
-  return { hash: row.pin_hash, salt: row.pin_salt };
-}
-
-export async function saveSettings(settings, pin) {
-  const body = { id: 1, data: settings, updated_at: new Date().toISOString() };
-  if (pin) {
-    body.pin_hash = pin.hash;
-    body.pin_salt = pin.salt;
-  }
+export async function saveSettings(settings) {
   await rest(`${SETTINGS}?on_conflict=id`, {
     method: 'POST',
     prefer: 'resolution=merge-duplicates,return=minimal',
-    body,
+    body: { id: 1, data: settings, updated_at: new Date().toISOString() },
   });
 }

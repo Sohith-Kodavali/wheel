@@ -109,6 +109,29 @@ p {
   white-space: nowrap;
 }
 
+.sound-toggle {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sound-toggle[aria-pressed="true"] {
+  border-color: #b9e6db;
+  background: #effbf8;
+  color: var(--done);
+}
+
+.sound-toggle:active {
+  transform: translateY(1px);
+}
+
 .quiet-link {
   color: var(--muted);
   font-size: 0.85rem;
@@ -439,6 +462,102 @@ p {
   text-align: right;
 }
 
+/* ---------------- all orders ---------------- */
+
+.orders-panel {
+  margin-top: 14px;
+}
+
+.orders-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.order-row {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto;
+  grid-template-areas: "head items foot";
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #fffdf9;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.order-head {
+  grid-area: head;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.order-number {
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.order-time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.order-items {
+  grid-area: items;
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.order-foot {
+  grid-area: foot;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-money {
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.order-money s {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.order-remove {
+  padding: 7px 12px;
+  border: 1px solid #f3c6d2;
+  border-radius: 999px;
+  background: #fff2f6;
+  color: #b01238;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.order-remove:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 @media (max-width: 760px) {
   .panels {
     grid-template-columns: 1fr;
@@ -464,6 +583,15 @@ p {
 
   .week-barwrap {
     height: 100px;
+  }
+}
+
+@media (max-width: 640px) {
+  .order-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "head foot"
+      "items items";
   }
 }
 

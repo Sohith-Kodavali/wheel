@@ -10,12 +10,7 @@ import {
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
-const adminLock = $('#admin-lock');
-const adminContent = $('#admin-content');
 const adminForm = $('#admin-form');
-const pinForm = $('#pin-form');
-const pinInput = $('#pin-input');
-const pinError = $('#pin-error');
 const adminError = $('#admin-error');
 const adminQrPreview = $('#admin-qr-preview');
 const adminMenuRows = $('#admin-menu-rows');
@@ -43,42 +38,11 @@ function menuItems() {
   });
 }
 
-function showLock() {
-  adminLock.hidden = false;
-  adminContent.hidden = true;
-  pinError.textContent = '';
-  pinInput.value = '';
-  setTimeout(() => pinInput.focus(), 80);
-}
-
 async function loadSettings() {
   const response = await fetch('/api/settings', { cache: 'no-store' });
   if (!response.ok) throw new Error('Could not load settings.');
   const data = await response.json();
   SETTINGS = normalizeSettings(data.settings);
-}
-
-async function hasSession() {
-  try {
-    const response = await fetch('/api/admin/session', { cache: 'no-store' });
-    if (!response.ok) return false;
-    const data = await response.json();
-    return Boolean(data.authed);
-  } catch {
-    return false;
-  }
-}
-
-async function enterAdmin() {
-  try {
-    await loadSettings();
-  } catch {
-    pinError.textContent = 'Could not load settings. Check the server connection.';
-    return;
-  }
-  adminLock.hidden = true;
-  adminContent.hidden = false;
-  populateForm();
 }
 
 function populateForm() {
@@ -88,7 +52,6 @@ function populateForm() {
   $('#admin-qr-mode').value = SETTINGS.qr.mode;
   $('#admin-max').value = SETTINGS.spin.maxDiscount / 100;
   $('#admin-min').value = SETTINGS.spin.minPayable / 100;
-  $('#admin-new-pin').value = '';
   adminImage = SETTINGS.qr.image || '';
   adminOffers = SETTINGS.wheel.segments.map((offer) => ({ ...offer }));
   adminSequence = SETTINGS.spin.sequence.slice();
@@ -302,35 +265,6 @@ async function handleQrUpload(file) {
   }
 }
 
-async function submitPin(event) {
-  event.preventDefault();
-  pinError.textContent = '';
-  const pin = pinInput.value.trim();
-  if (!/^\d{4,8}$/.test(pin)) {
-    pinError.textContent = 'Enter your 4–8 digit PIN.';
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      pinError.textContent = data.error || 'Wrong PIN. Try again.';
-      pinInput.value = '';
-      pinInput.focus();
-      return;
-    }
-    pinInput.value = '';
-    await enterAdmin();
-  } catch {
-    pinError.textContent = 'Could not reach the server.';
-  }
-}
-
 function buildSettings() {
   adminError.textContent = '';
 
@@ -341,7 +275,6 @@ function buildSettings() {
   const sequence = readAdminSequence();
   const maxDiscount = Math.round(Number($('#admin-max').value) * 100);
   const minPayable = Math.round(Number($('#admin-min').value) * 100);
-  const newPin = $('#admin-new-pin').value.trim();
 
   if (!UPI_PATTERN.test(upiId)) return { error: 'Enter a valid UPI ID, for example stall@bank.' };
   if (upiName.length < 2 || upiName.length > 60) return { error: 'UPI display name must be 2–60 characters.' };
@@ -375,7 +308,6 @@ function buildSettings() {
   if (!Number.isFinite(minPayable) || minPayable < 0 || minPayable > 1_000_000) {
     return { error: 'Enter a valid minimum payable amount.' };
   }
-  if (newPin && !/^\d{4,8}$/.test(newPin)) return { error: 'The admin PIN must be 4–8 digits.' };
 
   const menu = {};
   for (const row of adminMenuRows.querySelectorAll('.admin-menu-row')) {
@@ -398,7 +330,6 @@ function buildSettings() {
       wheel: { segments: normalizedOffers },
       spin: { sequence: steps, maxDiscount, minPayable },
     },
-    pin: newPin,
   };
 }
 
@@ -414,15 +345,10 @@ async function saveAdminSettings(event) {
     const response = await fetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ settings: built.settings, pin: built.pin || undefined }),
+      body: JSON.stringify({ settings: built.settings }),
     });
     const data = await response.json().catch(() => ({}));
 
-    if (response.status === 401) {
-      showLock();
-      pinError.textContent = 'Session expired. Sign in again.';
-      return;
-    }
     if (!response.ok) {
       adminError.textContent = data.error || 'Could not save settings.';
       return;
@@ -447,11 +373,6 @@ async function resetDefaults() {
     });
     const data = await response.json().catch(() => ({}));
 
-    if (response.status === 401) {
-      showLock();
-      pinError.textContent = 'Session expired. Sign in again.';
-      return;
-    }
     if (!response.ok) {
       adminError.textContent = data.error || 'Could not reset settings.';
       return;
@@ -465,19 +386,7 @@ async function resetDefaults() {
   }
 }
 
-async function logout() {
-  try {
-    await fetch('/api/admin/logout', { method: 'POST' });
-  } catch {
-    /* the cookie may still be valid; the lock screen is shown anyway */
-  }
-  showLock();
-  showToast('Signed out');
-}
-
-pinForm.addEventListener('submit', submitPin);
 adminForm.addEventListener('submit', saveAdminSettings);
-$('#admin-logout').addEventListener('click', logout);
 $('#admin-reset').addEventListener('click', resetDefaults);
 
 $('#admin-qr-file').addEventListener('change', async (event) => {
@@ -543,8 +452,12 @@ adminSequenceRows.addEventListener('click', (event) => {
 });
 
 async function boot() {
-  if (await hasSession()) await enterAdmin();
-  else showLock();
+  try {
+    await loadSettings();
+    populateForm();
+  } catch {
+    adminError.textContent = 'Could not load settings. Check the server connection.';
+  }
 }
 
 boot();
