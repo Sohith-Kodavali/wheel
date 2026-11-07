@@ -400,3 +400,5 @@ export async function handleApi(req, res, url) {
     else res.end();
   }
 }
+
+export default { handleApi };
