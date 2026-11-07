@@ -82,7 +82,7 @@ export const DEFAULT_WHEEL = [
   { id: 'off-5', label: '25% OFF', percent: 25, weight: 10, color: '#D3A8FF' },
 ];
 
-export const SPIN_MIN_ITEMS = 2;
+export const SPIN_MIN_TOTAL = 10000;
 export const SETTINGS_KEY = 'msf-tablet-settings-v1';
 export const UPI_PATTERN = /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9]{2,32}$/;
 

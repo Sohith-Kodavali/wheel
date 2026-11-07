@@ -3,7 +3,7 @@ import {
   DEFAULT_MENU,
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
-  SPIN_MIN_ITEMS,
+  SPIN_MIN_TOTAL,
   escapeHtml,
   normalizeSettings,
 } from './config.js';
@@ -206,26 +206,23 @@ function lines() {
 }
 
 function spinUnlocked() {
-  return countItems() >= SPIN_MIN_ITEMS;
+  return cartTotal() >= SPIN_MIN_TOTAL;
 }
 
 function spinShortfall() {
-  return Math.max(0, SPIN_MIN_ITEMS - countItems());
+  return Math.max(0, SPIN_MIN_TOTAL - cartTotal());
 }
 
 function updateSpinGate() {
+  const total = cartTotal();
   const count = countItems();
-  const unlocked = count >= SPIN_MIN_ITEMS;
-  const shortfall = Math.max(0, SPIN_MIN_ITEMS - count);
+  const unlocked = total >= SPIN_MIN_TOTAL;
+  const shortfall = Math.max(0, SPIN_MIN_TOTAL - total);
 
   if (barUnlock) {
     barUnlock.hidden = count === 0;
     barUnlock.textContent =
-      count === 0
-        ? ''
-        : unlocked
-          ? 'Spin & Win unlocked'
-          : `Add ${shortfall} more drink${shortfall === 1 ? '' : 's'} to unlock Spin & Win`;
+      count === 0 ? '' : unlocked ? 'Spin & Win unlocked' : `Add ${money(shortfall)} to unlock Spin & Win`;
     barUnlock.classList.toggle('is-unlocked', unlocked && count > 0);
   }
 
@@ -236,7 +233,7 @@ function updateSpinGate() {
   if (summarySub) {
     summarySub.textContent = unlocked
       ? 'Check the drinks, then spin for a discount or pay as is.'
-      : `Add ${shortfall} more drink${shortfall === 1 ? '' : 's'} to unlock Spin & Win, or continue to payment.`;
+      : `Add ${money(shortfall)} more to unlock Spin & Win, or continue to payment.`;
   }
 }
 
@@ -331,7 +328,7 @@ function promoWideTemplate() {
     <article class="promo-tile promo-wide" aria-hidden="true">
       <span class="mini-wheel" style="background:${conicGradient(SEGMENTS)}"></span>
       <div>
-        <span class="eyebrow">${SPIN_MIN_ITEMS}+ drinks get one spin</span>
+        <span class="eyebrow">Orders ${money(SPIN_MIN_TOTAL)}+ get one spin</span>
         <h3>SPIN &amp; WIN</h3>
         <p>Win up to ${maxWheelPercent()}% off your total. One spin, instantly applied.</p>
       </div>
@@ -521,25 +518,22 @@ function upsellCardTemplate(item) {
 
 function renderSummaryUpsell() {
   if (!summaryUpsell || !upsellRow) return;
-  const count = countItems();
-  if (count >= SPIN_MIN_ITEMS) {
+  const total = cartTotal();
+  if (total >= SPIN_MIN_TOTAL) {
     summaryUpsell.hidden = true;
     upsellRow.innerHTML = '';
     return;
   }
   summaryUpsell.hidden = false;
-  const needed = SPIN_MIN_ITEMS - count;
   const title = $('#upsell-title');
-  if (title) {
-    title.textContent = `Add ${needed} more drink${needed === 1 ? '' : 's'} to unlock the wheel`;
-  }
+  if (title) title.textContent = `Add ${money(SPIN_MIN_TOTAL - total)} more to unlock the wheel`;
   upsellRow.innerHTML = MENU.filter((item) => !item.outOfStock).map(upsellCardTemplate).join('');
 }
 
 function totalCardTemplate() {
   const total = cartTotal();
   const count = countItems();
-  const spin = state.spin && count >= SPIN_MIN_ITEMS ? state.spin : null;
+  const spin = state.spin && total >= SPIN_MIN_TOTAL ? state.spin : null;
 
   if (spin) {
     return `
@@ -569,8 +563,7 @@ function totalCardTemplate() {
       <p class="total-foot">One spin per order · discount applied instantly</p>`;
   }
 
-  if (count < SPIN_MIN_ITEMS) {
-    const needed = SPIN_MIN_ITEMS - count;
+  if (total < SPIN_MIN_TOTAL) {
     return `
       <span class="total-label">Your total</span>
       <strong class="total-amount">${money(total)}</strong>
@@ -580,15 +573,15 @@ function totalCardTemplate() {
         <div class="spin-nudge-top">
           <span class="nudge-wheel is-locked" style="background:${conicGradient(SEGMENTS)}" aria-hidden="true"></span>
           <div>
-            <h3>Spin &amp; Win unlocks at ${SPIN_MIN_ITEMS} drinks</h3>
-            <p>Add ${needed} more drink${needed === 1 ? '' : 's'} to spin the wheel.</p>
+            <h3>Spin &amp; Win unlocks at ${money(SPIN_MIN_TOTAL)}</h3>
+            <p>Add ${money(SPIN_MIN_TOTAL - total)} more to spin the wheel.</p>
           </div>
         </div>
         <button class="btn spin-btn-main" type="button" data-pay>
           Continue to payment · ${money(total)} ${icon('arrow')}
         </button>
       </div>
-      <p class="total-foot">No spin for orders with ${SPIN_MIN_ITEMS - 1} drinks or fewer</p>`;
+      <p class="total-foot">No spin for orders under ${money(SPIN_MIN_TOTAL)}</p>`;
   }
 
   return `
@@ -618,7 +611,7 @@ function renderSummary() {
     showScreen('menu');
     return;
   }
-  if (state.spin && countItems() < SPIN_MIN_ITEMS) clearSpin();
+  if (state.spin && cartTotal() < SPIN_MIN_TOTAL) clearSpin();
   summaryLines.innerHTML = items.map(lineTemplate).join('');
   totalCard.innerHTML = totalCardTemplate();
   renderSummaryUpsell();
@@ -733,8 +726,7 @@ function renderPay() {
   }
 
   const total = cartTotal();
-  const spin =
-    state.spin && state.spin.total === total && countItems() >= SPIN_MIN_ITEMS ? state.spin : null;
+  const spin = state.spin && state.spin.total === total && total >= SPIN_MIN_TOTAL ? state.spin : null;
   const final = spin ? spin.final : total;
 
   submitOrder(items, total, spin);
