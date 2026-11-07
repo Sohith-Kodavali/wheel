@@ -36,7 +36,7 @@ For a stall:
 
 ## Deploy on Vercel
 
-Vercel serves the pages statically and runs the API through `api/[...path].js`. `vercel.json` enables clean URLs, so `/chef`, `/analytics` and `/settings` work without `.html`.
+Vercel serves the pages statically and runs the API through `api/index.js`; `vercel.json` rewrites every `/api/*` request to it, because Vercel's catch-all function routes only match one path segment. `vercel.json` also enables clean URLs, so `/chef`, `/analytics` and `/settings` work without `.html`.
 
 1. Import the GitHub repo into Vercel (framework preset **Other**, no build command).
 2. Add these Environment Variables for Production and Preview:
